@@ -33,6 +33,33 @@ class FoodGroup(StrEnum):
     PREPARATION = "preparo"
 
 
+class GroupLimit(BaseModel):
+    """Faixa de massa total que um grupo de alimentos deve ter no prato.
+
+    Gera duas restrições no PL: a soma das massas dos alimentos do grupo
+    deve ficar entre ``mass.minimum`` e ``mass.maximum`` (em gramas).
+    Garante, por exemplo, que o prato tenha arroz, feijão e uma proteína.
+
+    Atributos:
+        group: grupo de alimentos a que a restrição se aplica.
+        mass: faixa da massa total do grupo, em gramas de alimento pronto.
+    """
+
+    group: FoodGroup
+    mass: Limit
+
+    @classmethod
+    def from_csv_row(cls, row: Mapping[str, str]) -> Self:
+        """Cria a restrição a partir de uma linha de ``grupos.csv``."""
+        return cls(
+            group=FoodGroup(row["grupo"]),
+            mass=Limit(
+                minimum=float(row["massa_min_g"]),
+                maximum=float(row["massa_max_g"]),
+            ),
+        )
+
+
 class Food(BaseModel):
     """Um alimento que pode entrar no almoço.
 
@@ -107,3 +134,9 @@ def load_foods(path: Path) -> list[Food]:
     """Lê todos os alimentos de um CSV no formato de ``alimentos_estimados.csv``."""
     with path.open(encoding="utf-8", newline="") as f:
         return [Food.from_csv_row(row) for row in csv.DictReader(f)]
+
+
+def load_group_limits(path: Path) -> list[GroupLimit]:
+    """Lê as faixas de massa por grupo de um CSV no formato de ``grupos.csv``."""
+    with path.open(encoding="utf-8", newline="") as f:
+        return [GroupLimit.from_csv_row(row) for row in csv.DictReader(f)]

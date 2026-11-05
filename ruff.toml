@@ -52,6 +52,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [lint.per-file-ignores]
 "src/bandejao/__init__.py" = ["T201"]
+"src/bandejao/feasibility_check.py" = ["T201"]
 
 [format]
 # Like Black, use double quotes for strings.
