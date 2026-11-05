@@ -1,0 +1,9 @@
+nutriente,minimo,maximo,unidade,base_DRI_diaria
+energia_kcal,700,950,kcal,"~2400 kcal/dia (média adultos 19-30 anos), 30-40% no almoço"
+proteina_g,20,,g,"RDA 46 g (mulher) a 56 g (homem); 35% de 56 g"
+carboidrato_g,45,,g,"RDA 130 g/dia; 35%"
+lipidio_g,15,37,g,"AMDR 20-35% da energia"
+fibra_g,10,,g,"AI 25 g (mulher) a 38 g (homem); ~35% da média"
+ferro_mg,6.3,,mg,"RDA 18 mg (mulher); 35%"
+calcio_mg,350,,mg,"RDA 1000 mg; 35%"
+sodio_mg,,800,mg,"limite 2300 mg/dia; 35%"

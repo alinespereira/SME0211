@@ -1,0 +1,6 @@
+{
+  "pythonVersion": "3.12",
+  "ignore": [
+    "src/verzo_omed_manual/db/model/**"
+  ]
+}
