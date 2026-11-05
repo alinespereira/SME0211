@@ -7,18 +7,19 @@ cada nutriente.
 
 Uso::
 
-    python -m bandejao.feasibility_check [--data-dir PASTA] [--skip NUTRIENTE ...]
+    feasibility-check [--data-dir PASTA] [--skip NUTRIENTE ...]
 
-``--skip`` retira nutrientes das restrições (por exemplo ``--skip calcio``),
+(ou ``python -m bandejao.feasibility_check``). ``--skip`` retira um nutriente
+das restrições e pode ser repetido (por exemplo ``--skip calcio``),
 para testar quais metas tornam o problema inviável. Aceita tanto o nome do
 nutriente (``calcio``) quanto o nome da coluna no CSV (``calcio_mg``).
 """
 
-import argparse
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+import click
 import numpy as np
 import numpy.typing as npt
 from scipy.optimize import linprog
@@ -99,25 +100,23 @@ def _is_skipped(nutrient: Nutrient, skipped: set[str]) -> bool:
     return nutrient.type in skipped or nutrient.column in skipped
 
 
-def main(argv: Sequence[str] | None = None) -> None:
+@click.command(help="Resolve o PL da dieta do almoço e imprime o resultado.")
+@click.option(
+    "--data-dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=lambda: Settings().root_dir / "data",
+    show_default="data/ na raiz do projeto",
+    help="Pasta com os CSVs.",
+)
+@click.option(
+    "--skip",
+    multiple=True,
+    metavar="NUTRIENTE",
+    help="Nutriente a retirar das restrições (ex.: calcio). Pode repetir.",
+)
+def main(data_dir: Path, skip: tuple[str, ...]) -> None:
     """Lê os dados, resolve o PL e imprime o resultado."""
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "--data-dir",
-        type=Path,
-        default=Settings().root_dir / "data",
-        help="pasta com os CSVs (padrão: data/ na raiz do projeto)",
-    )
-    parser.add_argument(
-        "--skip",
-        nargs="*",
-        default=[],
-        metavar="NUTRIENTE",
-        help="nutrientes a retirar das restrições (ex.: calcio)",
-    )
-    args = parser.parse_args(argv)
-    data_dir: Path = args.data_dir
-    skipped = set(args.skip)
+    skipped = set(skip)
 
     foods = load_foods(data_dir / "alimentos_estimados.csv")
     all_nutrients = load_nutrients(data_dir / "metas_dri_almoco.csv")
@@ -129,19 +128,19 @@ def main(argv: Sequence[str] | None = None) -> None:
         lp.c, A_ub=lp.a_ub, b_ub=lp.b_ub, bounds=lp.bounds, method="highs-ds"
     )
 
-    print(result.status, result.message)
+    click.echo(f"{result.status} {result.message}")
     x = result.x
     if result.status != 0 or x is None:
         return
-    print(f"custo R$ {result.fun:.2f}")
+    click.echo(f"custo R$ {result.fun:.2f}")
     for food, grams in zip(foods, x, strict=True):
         if grams > 1e-6:
-            print(f"  {food.description}: {grams:.0f} g")
+            click.echo(f"  {food.description}: {grams:.0f} g")
     for nutrient in all_nutrients:
         coefs = np.array([f.nutrient_per_gram(nutrient.type) for f in foods])
         amount = float(coefs @ x)
         status = "ok" if nutrient.is_met(amount) else "fora da meta"
-        print(f"  {nutrient.column}: {amount:.1f} ({status})")
+        click.echo(f"  {nutrient.column}: {amount:.1f} ({status})")
 
 
 if __name__ == "__main__":

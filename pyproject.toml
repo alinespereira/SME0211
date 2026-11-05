@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "click>=8.5.0",
     "matplotlib>=3.11.2",
     "numpy>=2.5.4",
     "pandas>=3.1.1",
@@ -19,6 +20,7 @@ dependencies = [
 
 [project.scripts]
 bandejao = "bandejao:main"
+feasibility-check = "bandejao.feasibility_check:main"
 
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]
