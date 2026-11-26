@@ -67,11 +67,10 @@ from pydantic import (
     model_validator,
 )
 
+from simplex.defaults import TOLERANCE
+
 type FloatArray = npt.NDArray[np.float64]
 """Array do numpy com entradas `float64` (de qualquer dimensão)."""
-
-# Tolerância para comparações em ponto flutuante (ex.: x_B >= 0).
-TOLERANCE = 1e-9
 
 
 def _as_float_array(value: object) -> FloatArray:
