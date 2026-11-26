@@ -1,0 +1,13 @@
+{#
+Template do pdoc para este projeto.
+
+Campos obrigatórios de modelos pydantic não têm valor padrão, e o pdoc
+mostraria "= PydanticUndefined" ao lado deles. Aqui escondemos esse valor.
+Uso: pdoc --math -t pdoc-templates simplex printing_company
+#}
+{% extends "default/module.html.jinja2" %}
+{% macro default_value(var) -%}
+    {%- if var.default_value_str != "PydanticUndefined" -%}
+        {{ default_default_value(var) }}
+    {%- endif -%}
+{%- endmacro %}
