@@ -1,0 +1,219 @@
+r"""Método simplex (implementação ingênua da aula 18) com regras anticiclagem.
+
+Cada iteração parte de um `simplex.tableau.Tableau` associado a uma base
+viável e segue os passos das aulas:
+
+1. **Otimalidade.** Calcule os custos reduzidos
+   $\bar{c}_j = c_j - p^\top A_j$. Se $\bar{c}_j \geq 0$ para todo $j$, a
+   solução básica viável atual é ótima e o método para.
+2. **Variável que entra.** Escolha $j$ com $\bar{c}_j < 0$.
+3. **Coluna pivô.** Calcule $u = B^{-1} A_j$. Se $u \leq 0$, então
+   $\theta^* = \infty$, o custo ótimo é $-\infty$ e o método para.
+4. **Variável que sai.** Calcule o passo
+   $$
+   \theta^* = \min_{\lbrace i \,:\, u_i > 0 \rbrace} \frac{x_{B(i)}}{u_i}
+   $$
+   e escolha uma linha $\ell$ que atinge esse mínimo.
+5. **Troca de base.** Substitua $B(\ell)$ por $j$.
+
+Em problemas degenerados ($x_{B(i)} = 0$ para algum $i$) pode haver
+$\theta^* = 0$, e o método pode voltar a uma base já visitada e repetir
+bases para sempre: é a **ciclagem**. As escolhas dos passos 2 e 4 são
+livres, e as regras anticiclagem (`PivotingRule`) as fixam de modo a
+garantir que o método termina em um número finito de iterações.
+
+**Índices.** Como em `simplex.tableau`, as aulas numeram as linhas de $1$ a
+$m$ e o código de $0$ a $m - 1$: a linha $\ell$ das fórmulas é o índice
+`ell - 1` do código.
+"""
+
+from enum import StrEnum
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from simplex.tableau import FloatArray, Tableau
+
+
+class PivotingRule(StrEnum):
+    r"""Regra anticiclagem usada para escolher quem entra e quem sai da
+    base."""
+
+    BLAND = "bland"
+    r"""Regra de Bland (do menor índice).
+
+    - Entra: o menor $j$ com $\bar{c}_j < 0$.
+    - Sai: entre as linhas $\ell$ que atingem $\theta^*$, a de menor índice
+      de variável $B(\ell)$.
+    """
+
+    LEXICOGRAPHIC = "lexicographic"
+    r"""Regra lexicográfica.
+
+    - Entra: qualquer $j$ com $\bar{c}_j < 0$ (por exemplo, o de menor
+      $\bar{c}_j$).
+    - Sai: entre as linhas $i$ com $u_i > 0$, a linha $\ell$ cujo vetor
+      $$
+      v_i = \frac{1}{u_i}
+      \begin{bmatrix} x_{B(i)} & (B^{-1} A)_i \end{bmatrix}
+      $$
+      é o lexicograficamente menor, em que $(B^{-1} A)_i$ é a linha $i$
+      de $B^{-1} A$. A primeira entrada de $v_i$ é $x_{B(i)} / u_i$, então
+      a escolha sempre atinge $\theta^*$; as demais só desempatam.
+
+    A garantia de término exige que, no tableau inicial, todas as linhas
+    $\begin{bmatrix} x_{B(i)} & (B^{-1} A)_i \end{bmatrix}$ sejam
+    lexicograficamente positivas (a primeira entrada não nula é positiva).
+    Isso vale, por exemplo, quando a base inicial é formada pelas variáveis
+    de folga e elas são as primeiras colunas de $A$.
+    """
+
+
+class Status(StrEnum):
+    """Como o método terminou."""
+
+    OPTIMAL = "optimal"
+    r"""Todos os custos reduzidos são não negativos: a solução é ótima."""
+
+    UNBOUNDED = "unbounded"
+    r"""Há $j$ com $\bar{c}_j < 0$ e $u = B^{-1} A_j \leq 0$: o custo ótimo
+    é $-\infty$."""
+
+    ITERATION_LIMIT = "iteration_limit"
+    """O número máximo de iterações foi atingido antes de uma conclusão."""
+
+
+class Result(BaseModel):
+    """Resultado de `Solver.solve`."""
+
+    status: Status
+    """Como o método terminou."""
+
+    tableau: Tableau
+    """Tableau da última base visitada (a ótima, se `status` for
+    `Status.OPTIMAL`)."""
+
+    iterations: int
+    """Número de trocas de base realizadas."""
+
+
+class Solver(BaseModel):
+    r"""Método simplex parametrizado pela regra anticiclagem.
+
+    Exemplo de uso:
+
+        solver = Solver(rule=PivotingRule.BLAND)
+        result = solver.solve(tableau)
+
+    Os métodos públicos correspondem aos passos do método descritos no
+    módulo; os métodos `_entering_*` e `_leaving_*` implementam a parte de
+    cada passo que depende da regra.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    rule: PivotingRule = PivotingRule.BLAND
+    """Regra anticiclagem usada nos passos 2 e 4."""
+
+    max_iterations: int = Field(default=1000, gt=0)
+    """Número máximo de trocas de base antes de desistir."""
+
+    # ------------------------------------------------------------------
+    # Laço principal
+    # ------------------------------------------------------------------
+
+    def solve(self: Self, tableau: Tableau) -> Result:
+        r"""Executa o método simplex a partir de uma base viável.
+
+        Repete os passos 1 a 5 até encontrar uma solução ótima, detectar
+        que o custo ótimo é $-\infty$ ou atingir `max_iterations`.
+
+        **Parâmetros:**
+
+        - `tableau`: tableau associado a uma base viável inicial.
+
+        **Devolve:** um `Result` com o status, o último tableau e o número
+        de iterações.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Passos de uma iteração
+    # ------------------------------------------------------------------
+
+    def is_optimal(self: Self, tableau: Tableau) -> bool:
+        r"""Passo 1: testa se $\bar{c}_j \geq 0$ para todo $j$.
+
+        Use a tolerância `simplex.tableau.TOLERANCE`: considere
+        $\bar{c}_j < 0$ só quando $\bar{c}_j < -\varepsilon$.
+        """
+        raise NotImplementedError
+
+    def entering_variable(self: Self, tableau: Tableau) -> int:
+        r"""Passo 2: escolhe o índice $j$ da variável que entra na base.
+
+        Deve ser chamado só quando a solução atual não é ótima, isto é,
+        quando existe $j$ com $\bar{c}_j < 0$. Delega a escolha a
+        `_entering_bland` ou `_entering_lexicographic`, conforme `rule`.
+        """
+        raise NotImplementedError
+
+    def leaving_row(self: Self, tableau: Tableau, u: FloatArray) -> int | None:
+        r"""Passo 4: escolhe a linha $\ell$ da variável que sai da base.
+
+        **Parâmetros:**
+
+        - `tableau`: tableau da iteração atual.
+        - `u`: coluna pivô $u = B^{-1} A_j$ (veja `Tableau.column`).
+
+        **Devolve:** o índice da linha $\ell$ que atinge
+        $\theta^* = \min_{u_i > 0} x_{B(i)} / u_i$, escolhida por
+        `_leaving_bland` ou `_leaving_lexicographic`, conforme `rule`; ou
+        `None` se $u \leq 0$ (custo ótimo $-\infty$).
+        """
+        raise NotImplementedError
+
+    def change_basis(self: Self, tableau: Tableau, j: int, ell: int) -> Tableau:
+        r"""Passo 5: troca $B(\ell)$ por $j$ e devolve o novo tableau.
+
+        A nova base é
+        $\bar{B} = \begin{bmatrix} A_{B(1)} & \cdots & A_{B(\ell-1)} & A_j &
+        A_{B(\ell+1)} & \cdots & A_{B(m)} \end{bmatrix}$.
+        Como `Tableau` guarda os dados originais, basta criar um novo
+        tableau com `basis` alterada; a validação confere que
+        $\bar{B}$ é inversível e que a nova solução é viável.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Partes que dependem da regra anticiclagem
+    # ------------------------------------------------------------------
+
+    def _entering_bland(self: Self, tableau: Tableau) -> int:
+        r"""Bland: o menor $j$ com $\bar{c}_j < 0$."""
+        raise NotImplementedError
+
+    def _entering_lexicographic(self: Self, tableau: Tableau) -> int:
+        r"""Lexicográfica: um $j$ com $\bar{c}_j < 0$ (a regra não restringe
+        a escolha; uma opção comum é o $j$ de menor $\bar{c}_j$)."""
+        raise NotImplementedError
+
+    def _leaving_bland(self: Self, tableau: Tableau, u: FloatArray) -> int:
+        r"""Bland: entre as linhas que atingem $\theta^*$, a de menor
+        $B(\ell)$.
+
+        Supõe que $u_i > 0$ para algum $i$.
+        """
+        raise NotImplementedError
+
+    def _leaving_lexicographic(
+        self: Self, tableau: Tableau, u: FloatArray
+    ) -> int:
+        r"""Lexicográfica: a linha $\ell$ com $u_\ell > 0$ cuja linha do
+        tableau dividida por $u_\ell$ é a lexicograficamente menor (veja
+        `PivotingRule.LEXICOGRAPHIC`).
+
+        As linhas do tableau sem a linha 0 são `tableau.table[1:]`.
+        Supõe que $u_i > 0$ para algum $i$.
+        """
+        raise NotImplementedError
