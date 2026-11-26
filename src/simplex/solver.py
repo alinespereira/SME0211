@@ -30,8 +30,10 @@ $m$ e o código de $0$ a $m - 1$: a linha $\ell$ das fórmulas é o índice
 from enum import StrEnum
 from typing import Self
 
+import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
+from simplex.defaults import TOLERANCE
 from simplex.tableau import FloatArray, Tableau
 
 
@@ -147,7 +149,7 @@ class Solver(BaseModel):
         Use a tolerância `simplex.tableau.TOLERANCE`: considere
         $\bar{c}_j < 0$ só quando $\bar{c}_j < -\varepsilon$.
         """
-        raise NotImplementedError
+        return all(tableau.reduced_costs >= TOLERANCE)
 
     def entering_variable(self: Self, tableau: Tableau) -> int:
         r"""Passo 2: escolhe o índice $j$ da variável que entra na base.
@@ -156,7 +158,11 @@ class Solver(BaseModel):
         quando existe $j$ com $\bar{c}_j < 0$. Delega a escolha a
         `_entering_bland` ou `_entering_lexicographic`, conforme `rule`.
         """
-        raise NotImplementedError
+        match self.rule:
+            case PivotingRule.LEXICOGRAPHIC:
+                return self._entering_lexicographic(tableau=tableau)
+            case PivotingRule.BLAND:
+                return self._entering_bland(tableau=tableau)
 
     def leaving_row(self: Self, tableau: Tableau, u: FloatArray) -> int | None:
         r"""Passo 4: escolhe a linha $\ell$ da variável que sai da base.
@@ -171,7 +177,11 @@ class Solver(BaseModel):
         `_leaving_bland` ou `_leaving_lexicographic`, conforme `rule`; ou
         `None` se $u \leq 0$ (custo ótimo $-\infty$).
         """
-        raise NotImplementedError
+        match self.rule:
+            case PivotingRule.LEXICOGRAPHIC:
+                return self._leaving_lexicographic(tableau=tableau, u=u)
+            case PivotingRule.BLAND:
+                return self._leaving_bland(tableau=tableau, u=u)
 
     def change_basis(self: Self, tableau: Tableau, j: int, ell: int) -> Tableau:
         r"""Passo 5: troca $B(\ell)$ por $j$ e devolve o novo tableau.
@@ -192,12 +202,17 @@ class Solver(BaseModel):
 
     def _entering_bland(self: Self, tableau: Tableau) -> int:
         r"""Bland: o menor $j$ com $\bar{c}_j < 0$."""
-        raise NotImplementedError
+        entering, *_ = np.flatnonzero(tableau.reduced_costs < TOLERANCE).astype(
+            int
+        )
+        return entering
 
     def _entering_lexicographic(self: Self, tableau: Tableau) -> int:
         r"""Lexicográfica: um $j$ com $\bar{c}_j < 0$ (a regra não restringe
         a escolha; uma opção comum é o $j$ de menor $\bar{c}_j$)."""
-        raise NotImplementedError
+        return np.random.choice(
+            np.flatnonzero(tableau.reduced_costs < TOLERANCE).astype(int)
+        )
 
     def _leaving_bland(self: Self, tableau: Tableau, u: FloatArray) -> int:
         r"""Bland: entre as linhas que atingem $\theta^*$, a de menor
@@ -205,7 +220,11 @@ class Solver(BaseModel):
 
         Supõe que $u_i > 0$ para algum $i$.
         """
-        raise NotImplementedError
+        thetas = tableau.basic_solution / u
+        theta_min = thetas.min()
+        upper_bound = theta_min + TOLERANCE
+        ell, *_ = np.flatnonzero(thetas < upper_bound)
+        return tableau.basis[ell]
 
     def _leaving_lexicographic(
         self: Self, tableau: Tableau, u: FloatArray
@@ -217,4 +236,7 @@ class Solver(BaseModel):
         As linhas do tableau sem a linha 0 são `tableau.table[1:]`.
         Supõe que $u_i > 0$ para algum $i$.
         """
-        raise NotImplementedError
+        candidates = np.flatnonzero(u > TOLERANCE)
+        rows = tableau.table[1:, :]
+        thetas = rows[candidates] / u[candidates]
+        return int(candidates[np.lexsort(thetas.T[::-1])[0]])
