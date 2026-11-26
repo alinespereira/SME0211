@@ -1,8 +1,9 @@
 """Configurações do projeto, lidas de variáveis de ambiente pelo pydantic-settings."""
 
 from pathlib import Path
+from typing import Self
 
-from pydantic import DirectoryPath, Field
+from pydantic import DirectoryPath, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).parent.parent.parent.resolve()
@@ -20,3 +21,11 @@ class Settings(BaseSettings):
     )
 
     root_dir: DirectoryPath = Field(default=ROOT_DIR)
+
+    @computed_field
+    def data_dir(self: Self) -> DirectoryPath:
+        return self.root_dir / "data"
+
+    @computed_field
+    def docs_dir(self: Self) -> DirectoryPath:
+        return self.root_dir / "docs"
