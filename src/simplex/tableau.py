@@ -74,8 +74,16 @@ TOLERANCE = 1e-9
 
 
 def _as_float_array(value: object) -> FloatArray:
-    """Converte listas, tuplas ou arrays para um array de `float64`."""
-    return np.asarray(value, dtype=np.float64)
+    """Converte listas, tuplas ou arrays para um array de `float64` somente
+    leitura.
+
+    O array é sempre copiado, para que o tableau não compartilhe memória
+    com quem o criou, e marcado como somente leitura, para que `A`, `b` e
+    `c` não possam ser alterados depois da validação.
+    """
+    array = np.array(value, dtype=np.float64)
+    array.setflags(write=False)
+    return array
 
 
 def _check_ndim(ndim: int, name: str) -> AfterValidator:
@@ -111,9 +119,13 @@ class Tableau(BaseModel):
     partir deles.
     """
 
-    # numpy.ndarray não é um tipo que o pydantic conheça; isto permite
-    # usá-lo nos campos (a conversão é feita pelos validadores acima).
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    # arbitrary_types_allowed: numpy.ndarray não é um tipo que o pydantic
+    # conheça; isto permite usá-lo nos campos (a conversão é feita pelos
+    # validadores acima).
+    # frozen: o tableau é imutável; não é possível reatribuir A, b, c ou
+    # basis. Para mudar de base, crie um novo Tableau com o construtor.
+    # (Evite model_copy(update=...): ele não roda os validadores.)
+    model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
     A: Matrix
     r"""Matriz de restrições $A \in \mathbb{R}^{m \times n}$."""
@@ -124,7 +136,7 @@ class Tableau(BaseModel):
     c: Vector
     r"""Vetor de custos $c \in \mathbb{R}^n$ do problema de minimização."""
 
-    basis: list[int]
+    basis: tuple[int, ...]
     r"""Índices das variáveis básicas: `basis[i]` é $B(i + 1)$, a variável
     básica da linha $i + 1$ do tableau (e da coluna $i + 1$ de $B$)."""
 
@@ -190,10 +202,10 @@ class Tableau(BaseModel):
         return int(self.A.shape[1])
 
     @property
-    def non_basis(self: Self) -> list[int]:
+    def non_basis(self: Self) -> tuple[int, ...]:
         """Índices das variáveis não básicas, em ordem crescente."""
         in_basis = set(self.basis)
-        return [j for j in range(self.num_variables) if j not in in_basis]
+        return tuple(j for j in range(self.num_variables) if j not in in_basis)
 
     @property
     def B(self: Self) -> FloatArray:  # noqa: N802
@@ -203,14 +215,14 @@ class Tableau(BaseModel):
         B = \begin{bmatrix} A_{B(1)} & \cdots & A_{B(m)} \end{bmatrix}.
         $$
         """
-        return self.A[:, self.basis]
+        return self.A[:, list(self.basis)]
 
     @property
     def basic_costs(self: Self) -> FloatArray:
         r"""Custos das variáveis básicas,
         $c_B = (c_{B(1)}, \dots, c_{B(m)})$.
         """
-        return self.c[self.basis]
+        return self.c[list(self.basis)]
 
     @property
     def basic_solution(self: Self) -> FloatArray:
@@ -260,7 +272,7 @@ class Tableau(BaseModel):
         variáveis não básicas iguais a zero.
         """
         x = np.zeros(self.num_variables)
-        x[self.basis] = self.basic_solution
+        x[list(self.basis)] = self.basic_solution
         return x
 
     @property

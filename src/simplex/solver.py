@@ -179,9 +179,14 @@ class Solver(BaseModel):
         A nova base é
         $\bar{B} = \begin{bmatrix} A_{B(1)} & \cdots & A_{B(\ell-1)} & A_j &
         A_{B(\ell+1)} & \cdots & A_{B(m)} \end{bmatrix}$.
-        Como `Tableau` guarda os dados originais, basta criar um novo
-        tableau com `basis` alterada; a validação confere que
-        $\bar{B}$ é inversível e que a nova solução é viável.
+        Como `Tableau` é imutável e guarda os dados originais, basta criar
+        um novo tableau com a tupla `basis` alterada na posição `ell`:
+
+            Tableau(A=tableau.A, b=tableau.b, c=tableau.c, basis=nova_base)
+
+        Use o construtor, e não `tableau.model_copy(update=...)`, porque só
+        o construtor roda a validação, que confere que $\bar{B}$ é
+        inversível e que a nova solução é viável.
         """
         raise NotImplementedError
 
