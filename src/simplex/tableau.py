@@ -54,6 +54,7 @@ em Python, começam em $0$. Assim, `basis[0]` é $B(1)$, `basis[1]` é
 $B(2)$ etc.
 """
 
+from collections.abc import Sequence
 from typing import Annotated, Self
 
 import numpy as np
@@ -123,8 +124,8 @@ class Tableau(BaseModel):
     # conheça; isto permite usá-lo nos campos (a conversão é feita pelos
     # validadores acima).
     # frozen: o tableau é imutável; não é possível reatribuir A, b, c ou
-    # basis. Para mudar de base, crie um novo Tableau com o construtor.
-    # (Evite model_copy(update=...): ele não roda os validadores.)
+    # basis. Para mudar de base, use `with_basis`, que cria um novo
+    # Tableau. (Evite model_copy(update=...): ele não roda os validadores.)
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
     A: Matrix
@@ -186,6 +187,25 @@ class Tableau(BaseModel):
                 "A base não é viável: x_B = B^{-1} b tem entradas negativas."
             )
         return self
+
+    # ------------------------------------------------------------------
+    # Troca de base
+    # ------------------------------------------------------------------
+
+    def with_basis(self: Self, basis: Sequence[int]) -> "Tableau":
+        r"""Devolve um novo tableau com os mesmos $A$, $b$ e $c$ e a base
+        `basis`.
+
+        O tableau atual não é alterado. O novo tableau é criado pelo
+        construtor, então passa por todas as validações: se a nova matriz
+        base $\bar{B}$ não for inversível ou a nova solução básica não for
+        viável, é levantado um `pydantic.ValidationError`.
+
+        **Parâmetros:**
+
+        - `basis`: os índices $\bar{B}(1), \dots, \bar{B}(m)$ da nova base.
+        """
+        return Tableau(A=self.A, b=self.b, c=self.c, basis=tuple(basis))
 
     # ------------------------------------------------------------------
     # Grandezas derivadas (calculadas a partir de A, b, c e basis)
