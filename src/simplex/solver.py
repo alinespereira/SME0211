@@ -194,7 +194,9 @@ class Solver(BaseModel):
         `ell`) e chamar `Tableau.with_basis`, que cria o novo tableau e
         confere que $\bar{B}$ é inversível e que a nova solução é viável.
         """
-        raise NotImplementedError
+        new_basis = list(tableau.basis)
+        new_basis[ell] = j
+        return tableau.with_basis(basis=new_basis)
 
     # ------------------------------------------------------------------
     # Partes que dependem da regra anticiclagem
