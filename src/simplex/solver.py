@@ -137,7 +137,28 @@ class Solver(BaseModel):
         **Devolve:** um `Result` com o status, o último tableau e o número
         de iterações.
         """
-        raise NotImplementedError
+        for i in range(self.max_iterations):
+            if self.is_optimal(tableau=tableau):
+                return Result(
+                    status=Status.OPTIMAL,
+                    tableau=tableau,
+                    iterations=i,
+                )
+            else:
+                entering = self.entering_variable(tableau=tableau)
+                u = tableau.column(entering)
+                leaving = self.leaving_row(tableau=tableau, u=u)
+                tableau = self.change_basis(
+                    tableau=tableau,
+                    j=entering,
+                    ell=leaving,
+                )
+
+        return Result(
+            status=Status.ITERATION_LIMIT,
+            tableau=tableau,
+            iterations=self.max_iterations,
+        )
 
     # ------------------------------------------------------------------
     # Passos de uma iteração
