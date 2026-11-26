@@ -164,7 +164,7 @@ class Solver(BaseModel):
             case PivotingRule.BLAND:
                 return self._entering_bland(tableau=tableau)
 
-    def leaving_row(self: Self, tableau: Tableau, u: FloatArray) -> int | None:
+    def leaving_row(self: Self, tableau: Tableau, u: FloatArray) -> int:
         r"""Passo 4: escolhe a linha $\ell$ da variável que sai da base.
 
         **Parâmetros:**
@@ -225,8 +225,8 @@ class Solver(BaseModel):
         thetas = tableau.basic_solution / u
         theta_min = thetas.min()
         upper_bound = theta_min + TOLERANCE
-        ell, *_ = np.flatnonzero(thetas < upper_bound)
-        return tableau.basis[ell]
+        ell = int(np.flatnonzero(thetas < upper_bound)[0])
+        return ell
 
     def _leaving_lexicographic(
         self: Self, tableau: Tableau, u: FloatArray
@@ -241,4 +241,5 @@ class Solver(BaseModel):
         candidates = np.flatnonzero(u > TOLERANCE)
         rows = tableau.table[1:, :]
         thetas = rows[candidates] / u[candidates]
-        return int(candidates[np.lexsort(thetas.T[::-1])[0]])
+        ell = int(candidates[np.lexsort(thetas.T[::-1])[0]])
+        return ell
