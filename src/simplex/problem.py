@@ -1,33 +1,7 @@
-r"""Descrição de problemas de otimização linear e conversão para a forma
+"""Descrição de problemas de otimização linear e conversão para a forma
 padrão.
 
-Um `Problem` descreve o problema como ele é escrito no papel:
-
-$$
-\begin{aligned}
-\min \text{ ou } \max \quad & c^\top x \cr
-\text{s.a.} \quad & a_i^\top x \;\square_i\; b_i, \quad
-\square_i \in \lbrace \leq, \geq, = \rbrace, \quad i = 1, \dots, m, \cr
-& x \geq 0,
-\end{aligned}
-$$
-
-e pode ser lido de um arquivo TOML (veja `Problem.from_toml` e
-`examples/`). Todas as variáveis são supostas não negativas.
-
-Para resolvê-lo com o simplex, o caminho é:
-
-1. `Problem.to_standard_form`: converte para a forma padrão
-   $\min \tilde{c}^\top \tilde{x}$, $\tilde{A} \tilde{x} = \tilde{b}$,
-   $\tilde{x} \geq 0$, com $\tilde{b} \geq 0$ (`StandardForm`);
-2. `StandardForm.initial_tableau`: encontra uma base viável inicial pela
-   Fase 1 (aula 22), resolvendo um problema auxiliar com variáveis
-   artificiais;
-3. `simplex.solver.Solver.solve`: a Fase 2, a partir dessa base;
-4. `StandardForm.original_solution` e `StandardForm.original_objective`:
-   traduzem a resposta de volta para as variáveis e o sentido originais.
-
-`Problem.solve` junta os quatro passos.
+.. include:: ../../docs/modulos/simplex.problem.md
 """
 
 import logging
@@ -71,18 +45,7 @@ _FLIPPED_SENSE: dict[ConstraintSense, ConstraintSense] = {
 def _linear_terms(
     *, coefs: FloatArray, names: Sequence[str]
 ) -> list[tuple[str, str]]:
-    r"""Os termos de $a^\top x$, um par `(sinal, termo)` por variável, para
-    alinhar em colunas.
-
-    O primeiro termo não nulo leva só o sinal `-` (se negativo), os
-    seguintes levam `" + "` ou `" - "`; coeficientes $\pm 1$ são omitidos
-    e os nulos viram `("", "")`.
-
-    >>> _linear_terms(coefs=np.array([1.0, -2.0, 0.0]), names=["x", "y", "z"])
-    [('', 'x'), (' - ', '2 y'), ('', '')]
-    >>> _linear_terms(coefs=np.array([0.0, -1.0, 0.5]), names=["x", "y", "z"])
-    [('', ''), ('-', 'y'), (' + ', '0.5 z')]
-    """
+    r"""Os termos de $a^\top x$, um par `(sinal, termo)` por variável."""
     terms: list[tuple[str, str]] = []
     first = True
     for value, name in zip(coefs.tolist(), names, strict=True):
@@ -104,16 +67,7 @@ def _linear_terms(
 
 
 class Constraint(BaseModel):
-    r"""Uma restrição $a_i^\top x \;\square_i\; b_i$.
-
-    **Exemplo:** $x_1 + 3 x_2 \leq 6$.
-
-    >>> k = Constraint(coefs=[1, 3], sense="<=", rhs=6)
-    >>> k.coefs.tolist()
-    [1.0, 3.0]
-    >>> k.rhs
-    6.0
-    """
+    r"""Uma restrição $a_i^\top x \;\square_i\; b_i$."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
@@ -128,42 +82,7 @@ class Constraint(BaseModel):
 
 
 class Problem(BaseModel):
-    r"""Problema de otimização linear, como escrito no papel.
-
-    **Exemplo:** o problema de `examples/pequeno.toml`,
-
-    $$
-    \begin{aligned}
-    \max \quad & 3 x_1 + 2 x_2 \cr
-    \text{s.a.} \quad & x_1 + x_2 \leq 4, \cr
-    & x_1 + 3 x_2 \leq 6, \cr
-    & x_1 \geq 1, \cr
-    & x \geq 0.
-    \end{aligned}
-    $$
-
-    >>> p = Problem(
-    ...     sense="max",
-    ...     c=[3, 2],
-    ...     constraints=(
-    ...         Constraint(coefs=[1, 1], sense="<=", rhs=4),
-    ...         Constraint(coefs=[1, 3], sense="<=", rhs=6),
-    ...         Constraint(coefs=[1, 0], sense=">=", rhs=1),
-    ...     ),
-    ... )
-    >>> p.variable_names
-    ('x1', 'x2')
-    >>> solution = p.solve()
-    >>> solution.status
-    <Status.OPTIMAL: 'optimal'>
-    >>> solution.x.tolist()
-    [4.0, 0.0]
-    >>> solution.objective
-    12.0
-
-    O mesmo problema pode ser lido de um arquivo com
-    `Problem.from_toml(path="examples/pequeno.toml")`.
-    """
+    """Problema de otimização linear, como escrito no papel."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
@@ -220,46 +139,8 @@ class Problem(BaseModel):
     # ------------------------------------------------------------------
 
     def __str__(self: Self) -> str:
-        r"""O problema como escrito no papel, com os termos alinhados por
+        """O problema como escrito no papel, com os termos alinhados por
         variável.
-
-        Coeficientes $\pm 1$ aparecem só com o sinal, coeficientes nulos
-        deixam o espaço da variável em branco e os números usam
-        `simplex.display.format_number`.
-
-        **Exemplo:** o problema do exemplo da classe.
-
-        >>> p = Problem(
-        ...     sense="max",
-        ...     c=[3, 2],
-        ...     constraints=(
-        ...         Constraint(coefs=[1, 1], sense="<=", rhs=4),
-        ...         Constraint(coefs=[1, 3], sense="<=", rhs=6),
-        ...         Constraint(coefs=[1, 0], sense=">=", rhs=1),
-        ...     ),
-        ... )
-        >>> print(p)
-        max   3 x1 + 2 x2
-        s.a.    x1 +   x2 <= 4
-                x1 + 3 x2 <= 6
-                x1        >= 1
-              x1, x2 >= 0
-
-        Com nomes, coeficientes negativos e uma igualdade:
-
-        >>> q = Problem(
-        ...     c=[1, -0.5, 0],
-        ...     constraints=(
-        ...         Constraint(coefs=[-1, 2, 0], sense="==", rhs=-3),
-        ...         Constraint(coefs=[0, 1, -1], sense="<=", rhs=10),
-        ...     ),
-        ...     names=("a", "b", "c"),
-        ... )
-        >>> print(q)
-        min    a - 0.5 b
-        s.a.  -a +   2 b     = -3
-                       b - c <= 10
-              a, b, c >= 0
         """
         rows = [
             self.c,
@@ -299,23 +180,7 @@ class Problem(BaseModel):
 
     @classmethod
     def from_toml(cls: type[Self], *, path: Path | str) -> Self:
-        """Lê um problema de um arquivo TOML.
-
-        O arquivo tem as mesmas chaves que os campos da classe; cada
-        restrição é uma tabela `[[constraints]]`:
-
-            sense = "max"
-            c = [3, 2]
-            names = ["x1", "x2"]
-
-            [[constraints]]
-            coefs = [1, 1]
-            sense = "<="
-            rhs = 4
-
-        Dica: `tomllib.load` (com o arquivo aberto em modo binário) devolve
-        um `dict`, e `cls.model_validate` cria e valida o problema.
-        """
+        """Lê um problema de um arquivo TOML (veja o módulo)."""
         path = Path(path)
         with path.open(mode="rb") as fp:
             return cls.model_validate(tomllib.load(fp))
@@ -325,25 +190,7 @@ class Problem(BaseModel):
     # ------------------------------------------------------------------
 
     def to_standard_form(self: Self) -> "StandardForm":
-        r"""Converte o problema para a forma padrão.
-
-        1. **Sentido.** Se for de maximização, troque $c$ por $-c$, pois
-           $\max c^\top x = -\min (-c)^\top x$; guarde o sinal em
-           `StandardForm.objective_sign`.
-        2. **Lado direito negativo.** Se $b_i < 0$, multiplique a restrição
-           por $-1$ e inverta o sentido ($\leq$ vira $\geq$ e vice-versa).
-        3. **Folgas e excessos.** Para cada restrição $i$, na ordem:
-           - $a_i^\top x \leq b_i$: some uma folga
-             $s_i \geq 0$, ficando $a_i^\top x + s_i = b_i$;
-           - $a_i^\top x \geq b_i$: subtraia um excesso
-             $e_i \geq 0$, ficando $a_i^\top x - e_i = b_i$;
-           - $a_i^\top x = b_i$: nada a fazer.
-
-        As colunas de $\tilde{A}$ são as $n$ variáveis originais, na
-        ordem, seguidas das folgas e dos excessos, na ordem das restrições,
-        com custo zero. Os nomes das novas variáveis são `s{i}` e `e{i}`,
-        com `i` começando em 1.
-        """
+        """Converte o problema para a forma padrão (veja o módulo)."""
         m = self.num_constraints
         sign: Literal[1, -1] = -1 if self.sense == "max" else 1
 
@@ -391,15 +238,7 @@ class Problem(BaseModel):
 
     def solve(self: Self, *, solver: Solver | None = None) -> "Solution":
         """Resolve o problema: forma padrão, Fase 1, Fase 2 e volta às
-        variáveis originais.
-
-        **Parâmetros:**
-
-        - `solver`: o `Solver` usado nas duas fases; se `None`, usa
-          `Solver()` (regra de Bland).
-
-        **Devolve:** uma `Solution`. Se a Fase 1 mostrar que o problema é
-        inviável, o status é `Status.INFEASIBLE`.
+        variáveis originais (com a regra de Bland se `solver` for `None`).
         """
         solver = solver if solver is not None else Solver()
         standard = self.to_standard_form()
@@ -421,51 +260,7 @@ class Problem(BaseModel):
 
 
 class StandardForm(BaseModel):
-    r"""Problema na forma padrão $\min \tilde{c}^\top \tilde{x}$,
-    $\tilde{A} \tilde{x} = \tilde{b}$, $\tilde{x} \geq 0$, com
-    $\tilde{b} \geq 0$, mais o que é preciso para voltar ao problema
-    original.
-
-    **Exemplo:** a forma padrão do problema do exemplo de `Problem`. O
-    $\max$ vira $\min$ (custos com sinal trocado), as restrições
-    $\leq$ ganham folgas `s1` e `s2` e a restrição $\geq$ ganha o excesso
-    `e3`.
-
-    >>> p = Problem(
-    ...     sense="max",
-    ...     c=[3, 2],
-    ...     constraints=(
-    ...         Constraint(coefs=[1, 1], sense="<=", rhs=4),
-    ...         Constraint(coefs=[1, 3], sense="<=", rhs=6),
-    ...         Constraint(coefs=[1, 0], sense=">=", rhs=1),
-    ...     ),
-    ... )
-    >>> sf = p.to_standard_form()
-    >>> sf.names
-    ('x1', 'x2', 's1', 's2', 'e3')
-    >>> for row in sf.A:
-    ...     print(row.tolist())
-    [1.0, 1.0, 1.0, 0.0, 0.0]
-    [1.0, 3.0, 0.0, 1.0, 0.0]
-    [1.0, 0.0, 0.0, 0.0, -1.0]
-    >>> sf.c.tolist()
-    [-3.0, -2.0, 0.0, 0.0, 0.0]
-    >>> sf.objective_sign
-    -1
-
-    A Fase 1 começa com as artificiais (colunas 5, 6 e 7) na base e
-    termina numa base viável só com colunas de $\tilde{A}$:
-
-    >>> sf.phase_one_tableau().basis
-    (5, 6, 7)
-    >>> sf.phase_one_tableau().variable_names[5:]
-    ('y1', 'y2', 'y3')
-    >>> t = sf.initial_tableau(solver=Solver())
-    >>> all(j < 5 for j in t.basis)
-    True
-    >>> sf.original_solution(x=t.solution).shape
-    (2,)
-    """
+    """Problema na forma padrão, com o necessário para voltar ao original."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
@@ -515,23 +310,7 @@ class StandardForm(BaseModel):
     # ------------------------------------------------------------------
 
     def phase_one_tableau(self: Self) -> Tableau:
-        r"""Tableau inicial do problema auxiliar da Fase 1.
-
-        Acrescenta uma variável artificial $y_i$ por restrição:
-
-        $$
-        \begin{aligned}
-        \min \quad & y_1 + \cdots + y_m \cr
-        \text{s.a.} \quad & \tilde{A} \tilde{x} + y = \tilde{b}, \cr
-        & \tilde{x} \geq 0, \; y \geq 0.
-        \end{aligned}
-        $$
-
-        A matriz é $[\tilde{A} \;|\; I_m]$, os custos são $(0, \dots, 0,
-        1, \dots, 1)$ e a base inicial são as artificiais (colunas $N$ a
-        $N + m - 1$, chamadas `y1`, ..., `ym`), viável porque
-        $\tilde{b} \geq 0$ e $B = I_m$.
-        """
+        """Tableau inicial do problema auxiliar da Fase 1 (veja o módulo)."""
         num_constraints, num_variables = self.A.shape
         A = np.hstack([self.A, np.eye(num_constraints)])  # noqa: N806
         b = self.b
@@ -547,25 +326,7 @@ class StandardForm(BaseModel):
         return Tableau(A=A, b=b, c=c, basis=basis, names=names)
 
     def initial_tableau(self: Self, *, solver: Solver) -> Tableau | None:
-        r"""Fase 1: encontra uma base viável para a forma padrão.
-
-        1. Resolva o problema auxiliar (`phase_one_tableau`) com `solver`
-           (os tableaux vão para o logger `simplex.logs.PHASE_ONE_LOGGER`).
-        2. Se o custo ótimo for positivo (maior que `TOLERANCE`), o
-           problema original é inviável: devolva `None`.
-        3. Senão, todas as artificiais valem zero. Se alguma artificial
-           ainda estiver na base (degenerada, na linha $\ell$), tire-a:
-           procure uma coluna original $j$ fora da base com
-           $(B^{-1} \tilde{A}_j)_\ell \neq 0$ e troque $B(\ell)$ por $j$.
-           Se não houver nenhuma, a restrição $\ell$ é redundante
-           (combinação das outras): remova essa linha.
-        4. Devolva o tableau com $\tilde{A}$, $\tilde{b}$, $\tilde{c}$
-           (sem as linhas redundantes) e a base encontrada, só com
-           colunas originais.
-
-        Na troca do passo 3 o pivô pode ser negativo, mas como a
-        artificial vale zero a solução continua viável.
-        """
+        """Fase 1: uma base viável da forma padrão, ou `None` se inviável."""
         num_constraints, num_variables = self.A.shape
 
         # 1. Resolve o problema auxiliar.
@@ -612,34 +373,16 @@ class StandardForm(BaseModel):
     # ------------------------------------------------------------------
 
     def original_solution(self: Self, *, x: FloatArray) -> FloatArray:
-        r"""Restringe uma solução $\tilde{x}$ da forma padrão às $n$
-        variáveis originais (descarta folgas e excessos)."""
+        r"""Restringe $\tilde{x}$ às $n$ variáveis originais."""
         return x[: self.num_original]
 
     def original_objective(self: Self, *, value: float) -> float:
-        r"""Converte o valor $\tilde{c}^\top \tilde{x}$ no valor da função
-        objetivo original, multiplicando por `objective_sign`."""
+        """Valor da função objetivo original (vezes `objective_sign`)."""
         return self.objective_sign * value
 
 
 class Solution(BaseModel):
-    r"""Resultado de `Problem.solve`, nas variáveis originais.
-
-    **Exemplo:** um problema inviável ($x_1 \leq 1$ e $x_1 \geq 2$).
-
-    >>> p = Problem(
-    ...     c=[1],
-    ...     constraints=(
-    ...         Constraint(coefs=[1], sense="<=", rhs=1),
-    ...         Constraint(coefs=[1], sense=">=", rhs=2),
-    ...     ),
-    ... )
-    >>> solution = p.solve()
-    >>> solution.status
-    <Status.INFEASIBLE: 'infeasible'>
-    >>> solution.x is None and solution.objective is None
-    True
-    """
+    """Resultado de `Problem.solve`, nas variáveis originais."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 

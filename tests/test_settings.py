@@ -8,6 +8,7 @@ das variáveis de ambiente."""
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from printing_company.settings import ENV_FILE, ROOT_DIR, Settings
 
@@ -52,3 +53,12 @@ def test_env_example_has_paper_values() -> None:
 
 def test_env_file_is_at_project_root() -> None:
     assert ENV_FILE == ROOT_DIR / ".env"
+
+
+def test_fields_can_be_given() -> None:
+    assert Settings(shift_hours=8).shift_hours == 8.0
+
+
+def test_energy_price_must_be_positive() -> None:
+    with pytest.raises(ValidationError, match="greater than 0"):
+        Settings(energy_price=0)

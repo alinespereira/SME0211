@@ -232,3 +232,22 @@ def test_solve_does_not_change_input(solver: Solver, small: Tableau) -> None:
 def test_solver_is_frozen() -> None:
     with pytest.raises(ValueError, match="frozen"):
         bland.rule = PivotingRule.LEXICOGRAPHIC  # type: ignore[misc]
+
+
+def test_result_single_constraint() -> None:
+    """Com uma restrição, x2 (custo 0) substitui x1 (custo 1) na base."""
+    t = Tableau(A=[[1, 1]], b=[2], c=[1, 0], basis=(0,))
+    result = Solver().solve(tableau=t)
+    assert result.status == Status.OPTIMAL
+    assert result.iterations == 1
+    assert result.tableau.basis == (1,)
+
+
+def test_bland_steps_one_at_a_time(small: Tableau) -> None:
+    """Os passos de uma iteração da regra de Bland, a partir das folgas."""
+    assert not bland.is_optimal(tableau=small)
+    j = bland.entering_variable(tableau=small)  # menor j com custo < 0
+    assert j == 0
+    u = small.column(j=j)
+    assert bland.leaving_row(tableau=small, u=u) == 0  # razões 4/1 e 6/1
+    assert bland.change_basis(tableau=small, j=0, ell=0).basis == (0, 3)

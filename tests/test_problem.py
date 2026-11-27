@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from simplex.problem import Constraint, Problem, StandardForm
+from simplex.problem import Constraint, Problem, StandardForm, _linear_terms
 from simplex.solver import PivotingRule, Solver, Status
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
@@ -275,3 +275,75 @@ def test_solve_redundant(solver: Solver) -> None:
     s = p.solve(solver=solver)
     assert s.status == Status.OPTIMAL
     assert s.objective == pytest.approx(0)
+
+
+# ----------------------------------------------------------------------
+# Exemplos (antes nas docstrings)
+# ----------------------------------------------------------------------
+
+
+def test_constraint_converts_to_floats() -> None:
+    k = Constraint(coefs=[1, 3], sense="<=", rhs=6)
+    assert k.coefs.tolist() == [1.0, 3.0]
+    assert k.rhs == 6.0
+
+
+def test_package_example_lexicographic() -> None:
+    """O exemplo do pacote `simplex`, sem a restrição x1 >= 1."""
+    p = make("max", [3, 2], ([1, 1], "<=", 4), ([1, 3], "<=", 6))
+    s = p.solve(solver=Solver(rule=PivotingRule.LEXICOGRAPHIC))
+    assert s.x is not None
+    assert s.x.tolist() == [4.0, 0.0]
+    assert s.objective == 12.0
+
+
+def test_pequeno_default_names(pequeno: Problem) -> None:
+    p = pequeno.model_copy(update={"names": None})
+    assert p.variable_names == ("x1", "x2")
+
+
+@pytest.mark.parametrize(
+    ("coefs", "terms"),
+    [
+        ([1.0, -2.0, 0.0], [("", "x"), (" - ", "2 y"), ("", "")]),
+        ([0.0, -1.0, 0.5], [("", ""), ("-", "y"), (" + ", "0.5 z")]),
+    ],
+)
+def test_linear_terms(coefs: list[float], terms: list[tuple[str, str]]) -> None:
+    assert _linear_terms(coefs=np.array(coefs), names=["x", "y", "z"]) == terms
+
+
+def test_str_pequeno(pequeno: Problem) -> None:
+    assert str(pequeno) == (
+        "max   3 x1 + 2 x2\n"
+        "s.a.    x1 +   x2 <= 4\n"
+        "        x1 + 3 x2 <= 6\n"
+        "        x1        >= 1\n"
+        "      x1, x2 >= 0"
+    )
+
+
+def test_str_names_negative_and_equality() -> None:
+    q = Problem(
+        c=[1, -0.5, 0],
+        constraints=(
+            Constraint(coefs=[-1, 2, 0], sense="==", rhs=-3),
+            Constraint(coefs=[0, 1, -1], sense="<=", rhs=10),
+        ),
+        names=("a", "b", "c"),
+    )
+    assert str(q) == (
+        "min    a - 0.5 b\n"
+        "s.a.  -a +   2 b     = -3\n"
+        "               b - c <= 10\n"
+        "      a, b, c >= 0"
+    )
+
+
+def test_phase_one_names_and_initial_basis(pequeno: Problem) -> None:
+    sf = pequeno.to_standard_form()
+    assert sf.phase_one_tableau().variable_names[5:] == ("y1", "y2", "y3")
+    t = sf.initial_tableau(solver=Solver())
+    assert t is not None
+    assert all(j < 5 for j in t.basis)
+    assert sf.original_solution(x=t.solution).shape == (2,)

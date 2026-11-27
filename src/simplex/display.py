@@ -1,27 +1,6 @@
-r"""Exibição do tableau, com destaque para o pivô de uma iteração.
+"""Exibição do tableau, com destaque para o pivô de uma iteração.
 
-`render_tableau` monta o tableau completo (veja `simplex.tableau.Tableau.table`)
-
-$$
-\begin{array}{c|c}
--c_B^\top x_B & \bar{c}^\top \cr
-\hline
-x_B & B^{-1} A
-\end{array}
-$$
-
-como um `rich.text.Text`, com os nomes das variáveis no cabeçalho e o nome
-da variável básica $x_{B(i)}$ no início de cada linha. Numa iteração do
-simplex, destaca
-
-- a coluna $j$ da variável que **entra** (marcada com `↓` no cabeçalho e
-  em ciano);
-- a linha $\ell$ da variável que **sai** (marcada com `→` antes do nome e
-  em magenta);
-- o **pivô** $u_\ell = (B^{-1} A_j)_\ell$, entre colchetes e em amarelo.
-
-As marcas aparecem no texto puro (`Text.plain`, que vai para arquivos de
-log e para os doctests) e as cores só no terminal (veja `simplex.logs`).
+.. include:: ../../docs/modulos/simplex.display.md
 """
 
 from rich.text import Text
@@ -51,21 +30,7 @@ _SEPARATOR = " │"
 
 
 def format_number(*, value: float) -> str:
-    """Formata uma entrada do tableau com até 4 algarismos significativos.
-
-    Valores com módulo até `simplex.defaults.TOLERANCE` (resíduos de ponto
-    flutuante, como `-2.22e-16`) aparecem como `0`, e somar `0.0` evita
-    imprimir `-0`.
-
-    >>> format_number(value=2 / 3)
-    '0.6667'
-    >>> format_number(value=-0.0)
-    '0'
-    >>> format_number(value=-2.22e-16)
-    '0'
-    >>> format_number(value=1500.0)
-    '1500'
-    """
+    """Formata uma entrada do tableau com até 4 algarismos significativos."""
     if abs(value) <= TOLERANCE:
         value = 0.0
     return f"{value + 0.0:.4g}"
@@ -77,46 +42,8 @@ def render_tableau(
     entering: int | None = None,
     leaving: int | None = None,
 ) -> Text:
-    r"""Monta o tableau completo como texto, destacando a variável que
-    entra, a que sai e o pivô.
-
-    **Parâmetros:**
-
-    - `tableau`: o tableau a exibir; os nomes vêm de
-      `simplex.tableau.Tableau.variable_names`.
-    - `entering`: o índice $j$ da variável que entra, ou `None`.
-    - `leaving`: o índice da linha $\ell$ da variável que sai (como em
-      `simplex.solver.Solver.leaving_row`, a partir de 0), ou `None`.
-
-    O pivô só é destacado quando `entering` e `leaving` são dados.
-
-    **Exemplo:** o problema do exemplo de `simplex.tableau.Tableau`, em que
-    $x_2$ entra e a folga $s_2$ sai, com pivô $3$.
-
-    >>> t = Tableau(
-    ...     A=[[1, 1, 1, 0], [1, 3, 0, 1]],
-    ...     b=[4, 6],
-    ...     c=[-1, -2, 0, 0],
-    ...     basis=(2, 3),
-    ...     names=("x1", "x2", "s1", "s2"),
-    ... )
-    >>> print(render_tableau(tableau=t, entering=1, leaving=1).plain)
-            │ x1  x2 ↓ s1  s2
-    ────────┼─────────────────
-      -z 0  │ -1   -2   0   0
-    ────────┼─────────────────
-      s1 4  │  1    1   1   0
-    → s2 6  │  1   [3]  0   1
-
-    Sem `entering` e `leaving`, nada é destacado:
-
-    >>> print(render_tableau(tableau=t.with_basis(basis=(0, 1))).plain)
-            │ x1  x2    s1    s2
-    ────────┼────────────────────
-      -z 5  │  0   0   0.5   0.5
-    ────────┼────────────────────
-      x1 3  │  1   0   1.5  -0.5
-      x2 1  │  0   1  -0.5   0.5
+    """Monta o tableau como texto, destacando a variável que entra, a que
+    sai e o pivô (veja o módulo).
     """
     names = tableau.variable_names
     basic_names = [names[j] for j in tableau.basis]
