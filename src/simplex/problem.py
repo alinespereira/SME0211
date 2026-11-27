@@ -41,6 +41,15 @@ from simplex.defaults import TOLERANCE
 from simplex.solver import Result, Solver, Status
 from simplex.tableau import FloatArray, Matrix, Tableau, Vector
 
+__all__ = [
+    "Constraint",
+    "ConstraintSense",
+    "ObjectiveSense",
+    "Problem",
+    "Solution",
+    "StandardForm",
+]
+
 type ConstraintSense = Literal["<=", ">=", "=="]
 """Sentido de uma restrição: $\\leq$, $\\geq$ ou $=$."""
 

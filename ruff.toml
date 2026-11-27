@@ -40,8 +40,12 @@ target-version = "py312"
 
 [lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
-select = ["E4", "E7", "E9", "F", "Q000", "W", "T20", "N", "I", "ANN", "ARG"]
-ignore = ["ANN002", "ANN003", "D100","D107"]
+select = [
+    "E4", "E7", "E9", "F", "Q000", "W", "T20", "N", "I", "ANN", "ARG",
+    # Docstring obrigatória em todo módulo (D100) e pacote (D104).
+    "D100", "D104",
+]
+ignore = ["ANN002", "ANN003", "D107"]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]

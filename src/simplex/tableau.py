@@ -69,6 +69,8 @@ from pydantic import (
 
 from simplex.defaults import TOLERANCE
 
+__all__ = ["FloatArray", "Matrix", "Tableau", "Vector"]
+
 type FloatArray = npt.NDArray[np.float64]
 """Array do numpy com entradas `float64` (de qualquer dimensão)."""
 
