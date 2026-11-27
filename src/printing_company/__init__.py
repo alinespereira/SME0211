@@ -24,34 +24,56 @@ modelo do artigo, focada no tempo de impressão, resolvida com o pacote
 ('Portfolio II', 20)
 """
 
-from pathlib import Path
+import logging
+import math
 
-import click
+from rich.logging import RichHandler
 
+from printing_company.problem.data import finishers, portfolios, printers
+from printing_company.problem.model import (
+    SHIFT_HOURS,
+    build_problem,
+    min_capacity,
+)
 from printing_company.settings import Settings
+from simplex import PivotingRule, Solver
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    datefmt="[%X]",
+    handlers=[RichHandler(rich_tracebacks=True, markup=True)],
+)
+
+logger = logging.getLogger(__name__)
 
 settings = Settings()
 """Configurações do projeto, carregadas na importação."""
 
 
-@click.command(help="Resolve o PL da dieta do almoço e imprime o resultado.")
-@click.option(
-    "--data-dir",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    default=settings.data_dir,
-    show_default="data/ na raiz do projeto",
-    help="Pasta com os CSVs.",
-)
-@click.option(
-    "--skip",
-    multiple=True,
-    metavar="NUTRIENTE",
-    help="Nutriente a retirar das restrições (ex.: calcio). Pode repetir.",
-)
-def main(*, data_dir: Path, skip: tuple[str, ...]) -> None:
-    """Ponto de entrada do comando `printing-company` (ainda não
-    implementado)."""
-    raise NotImplementedError
+def main() -> None:
+    """Ponto de entrada do comando `printing-company`: resolve as três
+    carteiras do artigo, cada uma com o menor número de turnos diários
+    (`SHIFT_HOURS`) que a torna viável (veja `min_capacity`)."""
+    for portfolio in portfolios:
+        days = math.ceil(
+            min_capacity(
+                portfolio=portfolio,
+                printers=printers,
+                finishings=finishers,
+            )
+            / SHIFT_HOURS
+        )
+        problem = build_problem(
+            portfolio=portfolio,
+            printers=printers,
+            finishings=finishers,
+            capacity=days * SHIFT_HOURS,
+        )
+        logger.info(f">>> {portfolio.label}: {days} turnos")
+        solver = Solver(rule=PivotingRule.LEXICOGRAPHIC)
+        solution = problem.solve(solver=solver)
+        logger.info(solution.model_dump(exclude={"result"}))
 
 
 if __name__ == "__main__":

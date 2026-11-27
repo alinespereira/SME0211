@@ -20,6 +20,7 @@ Todos os modelos são imutáveis (`frozen`).
 """
 
 from abc import ABC
+from functools import cached_property
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, PositiveFloat, computed_field
@@ -162,6 +163,8 @@ class Portfolio(BaseModel):
     ...         Demand(label="boletos", quantity=1200, requires_finishing=True),
     ...     ]
     ... )
+    >>> portfolio.total
+    3500.0
     >>> portfolio.with_finishing
     2700.0
     >>> portfolio.without_finishing
@@ -181,7 +184,18 @@ class Portfolio(BaseModel):
     demands: list[Demand]
     """Demandas dos itens, na ordem em que foram pedidos."""
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
+    @cached_property
+    def total(self) -> float:
+        r"""Total, em metros, dos itens demandados:
+        $\sum_{i \in I} D_i$."""
+        return sum(
+            (demand.quantity for demand in self.demands),
+            start=0.0,
+        )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @cached_property
     def with_finishing(self) -> float:
         r"""Total, em metros, dos itens que precisam de acabamento:
         $\sum_{i \in F} D_i$."""
@@ -194,7 +208,8 @@ class Portfolio(BaseModel):
             start=0.0,
         )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
+    @cached_property
     def without_finishing(self) -> float:
         r"""Total, em metros, dos itens que não precisam de acabamento:
         $\sum_{i \in I \setminus F} D_i$."""
