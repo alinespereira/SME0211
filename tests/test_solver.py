@@ -112,6 +112,30 @@ def test_leaving_row_unbounded_returns_none(
     assert solver.leaving_row(tableau=unbounded, u=u) is None
 
 
+def test_leaving_row_unbounded_with_zero_entry(solver: Solver) -> None:
+    """u = (-1, 0): nenhuma entrada positiva, então não há quem saia (o
+    zero não conta como candidato)."""
+    t = Tableau(
+        A=[[1, 0, -1], [0, 1, 0]],
+        b=[1, 1],
+        c=[0, 0, -1],
+        basis=(0, 1),
+    )
+    u = t.column(j=2)
+    np.testing.assert_allclose(u, [-1, 0])
+    assert solver.leaving_row(tableau=t, u=u) is None
+
+
+def test_solve_unbounded_with_zero_entry(solver: Solver) -> None:
+    t = Tableau(
+        A=[[1, 0, -1], [0, 1, 0]],
+        b=[1, 1],
+        c=[0, 0, -1],
+        basis=(0, 1),
+    )
+    assert solver.solve(tableau=t).status == Status.UNBOUNDED
+
+
 def test_leaving_bland_tie_smallest_basic_index(aula21: Tableau) -> None:
     """Empate entre as linhas 0 e 2 (razão 1/3). Com basis = (3, 4, 5),
     B(0) = 3 < B(2) = 5: sai a linha 0."""

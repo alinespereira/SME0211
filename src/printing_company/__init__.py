@@ -21,7 +21,8 @@ iteração do simplex, com a variável que entra, a que sai e o pivô em
 destaque (veja `simplex.display`):
 
 ```sh
-uv run printing-company --debug
+uv run printing-company --debug              # as três carteiras
+uv run printing-company --debug --portfolio 2  # só a Portfolio II
 ```
 
 **Exemplo:** a primeira carteira de pedidos do artigo.
@@ -67,17 +68,30 @@ settings = Settings()
         "simplex (variável que entra, que sai e pivô em destaque)."
     ),
 )
-def main(*, debug: bool) -> None:
+@click.option(
+    "-p",
+    "--portfolio",
+    "selected",
+    type=click.IntRange(1, len(portfolios)),
+    multiple=True,
+    help=(
+        f"Número da carteira a resolver (de 1 a {len(portfolios)}); pode "
+        "ser repetida, como em `-p 1 -p 3`. Sem ela, resolve todas."
+    ),
+)
+def main(*, debug: bool, selected: tuple[int, ...]) -> None:
     """Resolve as três carteiras de pedidos do artigo.
 
-    Cada carteira é resolvida com o menor número de turnos diários que a
+    Com `--portfolio`, resolve só as carteiras escolhidas (numeradas de 1
+    a 3, na ordem do artigo). Cada carteira é resolvida com o menor número de turnos diários que a
     torna viável; para cada uma, mostra o tempo real (com setup), o
     consumo e o custo de energia.
     """
     # A docstring acima é a ajuda do comando (`printing-company --help`).
     # Veja `SHIFT_HOURS`, `min_capacity` e `printing_company.problem.analysis`.
     configure_logging(debug=debug)
-    for portfolio in portfolios:
+    chosen = sorted(set(selected)) or range(1, len(portfolios) + 1)
+    for portfolio in (portfolios[k - 1] for k in chosen):
         days = math.ceil(
             min_capacity(
                 portfolio=portfolio,

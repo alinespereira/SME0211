@@ -311,7 +311,8 @@ class Solver(BaseModel):
         `_leaving_bland` ou `_leaving_lexicographic`, conforme `rule`; ou
         `None` se $u \leq 0$ (custo ótimo $-\infty$).
         """
-        if np.all(u < -TOLERANCE):
+        # u <= 0 (a menos da tolerância): nenhuma linha limita o passo.
+        if np.all(u <= TOLERANCE):
             return None
 
         match self.rule:

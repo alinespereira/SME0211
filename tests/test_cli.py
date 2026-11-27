@@ -36,6 +36,34 @@ def test_main_sets_log_level(args: list[str], level: int) -> None:
     assert logging.getLogger().level == level
 
 
+@pytest.mark.usefixtures("_restore_root_level")
+@pytest.mark.parametrize(
+    ("args", "labels"),
+    [
+        ([], ["Portfolio I", "Portfolio II", "Portfolio III"]),
+        (["--portfolio", "2"], ["Portfolio II"]),
+        (["-p", "3", "-p", "1", "-p", "3"], ["Portfolio I", "Portfolio III"]),
+    ],
+)
+def test_main_portfolio_option(
+    caplog: pytest.LogCaptureFixture, args: list[str], labels: list[str]
+) -> None:
+    with caplog.at_level(logging.INFO, logger="printing_company"):
+        result = CliRunner().invoke(main, args)
+    assert result.exit_code == 0, result.output
+    solved = [
+        r.getMessage().removeprefix(">>> ").split(":")[0]
+        for r in caplog.records
+        if r.getMessage().startswith(">>> ")
+    ]
+    assert solved == labels
+
+
+def test_main_rejects_unknown_portfolio() -> None:
+    result = CliRunner().invoke(main, ["--portfolio", "4"])
+    assert result.exit_code != 0
+
+
 def test_main_help_mentions_debug() -> None:
     result = CliRunner().invoke(main, ["--help"])
     assert result.exit_code == 0
