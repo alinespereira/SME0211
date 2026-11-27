@@ -72,9 +72,8 @@ def main() -> None:
         )
         logger.info(f">>> {portfolio.label}: {days} turnos")
         solver = Solver(rule=PivotingRule.LEXICOGRAPHIC)
-        logger.info(problem.to_standard_form().initial_tableau(solver=solver))
         solution = problem.solve(solver=solver)
-        logger.info(solution)
+        logger.info(solution.model_dump(exclude={"result"}))
 
 
 if __name__ == "__main__":
