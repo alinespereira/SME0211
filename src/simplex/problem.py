@@ -30,6 +30,7 @@ Para resolvê-lo com o simplex, o caminho é:
 `Problem.solve` junta os quatro passos.
 """
 
+import tomllib
 from pathlib import Path
 from typing import Literal, Self
 
@@ -145,7 +146,9 @@ class Problem(BaseModel):
         Dica: `tomllib.load` (com o arquivo aberto em modo binário) devolve
         um `dict`, e `cls.model_validate` cria e valida o problema.
         """
-        raise NotImplementedError
+        path = Path(path)
+        with path.open(mode="rb") as fp:
+            return cls.model_validate(tomllib.load(fp))
 
     # ------------------------------------------------------------------
     # Conversão e resolução
