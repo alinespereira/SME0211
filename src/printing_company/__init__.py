@@ -29,6 +29,11 @@ import math
 
 from rich.logging import RichHandler
 
+from printing_company.problem.analysis import (
+    energy_consumption,
+    energy_cost,
+    operating_times,
+)
 from printing_company.problem.data import finishers, portfolios, printers
 from printing_company.problem.model import (
     SHIFT_HOURS,
@@ -54,7 +59,9 @@ settings = Settings()
 def main() -> None:
     """Ponto de entrada do comando `printing-company`: resolve as três
     carteiras do artigo, cada uma com o menor número de turnos diários
-    (`SHIFT_HOURS`) que a torna viável (veja `min_capacity`)."""
+    (`SHIFT_HOURS`) que a torna viável (veja `min_capacity`), e mostra o
+    tempo real (com setup), o consumo e o custo de energia (veja
+    `printing_company.problem.analysis`)."""
     for portfolio in portfolios:
         days = math.ceil(
             min_capacity(
@@ -74,6 +81,22 @@ def main() -> None:
         solver = Solver(rule=PivotingRule.LEXICOGRAPHIC)
         solution = problem.solve(solver=solver)
         logger.info(solution.model_dump(exclude={"result"}))
+        if solution.x is None:
+            continue
+        machines = [*printers, *finishers]
+        hours = dict(
+            zip(problem.variable_names, solution.x.tolist(), strict=True)
+        )
+        times = operating_times(hours=hours, machines=machines)
+        energy = energy_consumption(times=times, machines=machines)
+        logger.info(
+            {name: round(tau, 2) for name, tau in times.items() if tau > 0}
+        )
+        logger.info(
+            f"Tempo real: {sum(times.values()):.2f} h; "
+            f"energia: {sum(energy.values()):.2f} kWh; "
+            f"custo: R$ {energy_cost(energy=energy):.2f}"
+        )
 
 
 if __name__ == "__main__":
