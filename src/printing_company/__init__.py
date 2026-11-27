@@ -114,6 +114,7 @@ def main(*, debug: bool, phase_one: bool, selected: tuple[int, ...]) -> None:
             capacity=days * SHIFT_HOURS,
         )
         logger.info(f">>> {portfolio.label}: {days} turnos")
+        logger.info(problem)
         solver = Solver(rule=PivotingRule.LEXICOGRAPHIC)
         solution = problem.solve(solver=solver)
         logger.info(solution.model_dump(exclude={"result"}))
