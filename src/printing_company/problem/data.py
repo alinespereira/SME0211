@@ -5,11 +5,6 @@ As máquinas vêm da Tabela 1 (velocidade em m/h, setup em h e consumo em
 kWh) e as carteiras de pedidos, das Tabelas 2 a 4 (demandas em metros). Os
 itens que exigem acabamento são D01 a D05 na carteira I, D01 a D10 na II e
 D01 a D35 na III.
-
->>> len(printers), len(finishers), [len(p.demands) for p in portfolios]
-(5, 3, [10, 20, 50])
->>> portfolios[1].with_finishing, portfolios[1].without_finishing
-(543000.0, 620000.0)
 """
 
 from .spec import Demand, FinishingMachine, Portfolio, PrintingMachine
