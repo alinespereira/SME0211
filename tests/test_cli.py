@@ -5,12 +5,14 @@
 # pyright: reportArgumentType=false
 
 import logging
+import re
 from collections.abc import Iterator
 
 import pytest
 from click.testing import CliRunner
 
 from printing_company import main
+from printing_company.settings import Settings
 from simplex.logs import PHASE_ONE_LOGGER, RICH_TEXT
 from simplex.solver import Solver
 from simplex.tableau import Tableau
@@ -38,6 +40,16 @@ def test_main_sets_log_level(args: list[str], level: int) -> None:
     assert logging.getLogger().level == level
 
 
+def _titles(output: str) -> list[tuple[str, str]]:
+    """As carteiras e os objetivos dos títulos da saída do comando."""
+    return re.findall(r"(Portfolio [IV]+) · objetivo: (\w+)", output)
+
+
+def _br_number(text: str) -> float:
+    """Converte um número no padrão brasileiro (`3.498,43`) em float."""
+    return float(text.replace(".", "").replace(",", "."))
+
+
 @pytest.mark.usefixtures("_restore_root_level")
 @pytest.mark.parametrize(
     ("args", "labels"),
@@ -47,18 +59,65 @@ def test_main_sets_log_level(args: list[str], level: int) -> None:
         (["-p", "3", "-p", "1", "-p", "3"], ["Portfolio I", "Portfolio III"]),
     ],
 )
-def test_main_portfolio_option(
-    caplog: pytest.LogCaptureFixture, args: list[str], labels: list[str]
-) -> None:
-    with caplog.at_level(logging.INFO, logger="printing_company"):
-        result = CliRunner().invoke(main, args)
+def test_main_portfolio_option(args: list[str], labels: list[str]) -> None:
+    result = CliRunner().invoke(main, args)
     assert result.exit_code == 0, result.output
-    solved = [
-        r.getMessage().removeprefix(">>> ").split(":")[0]
-        for r in caplog.records
-        if r.getMessage().startswith(">>> ")
-    ]
-    assert solved == labels
+    assert [label for label, _ in _titles(result.output)] == labels
+
+
+@pytest.mark.usefixtures("_restore_root_level")
+@pytest.mark.parametrize(
+    ("args", "has_summary"),
+    [(["-p", "1"], False), (["-p", "1", "-p", "2"], True)],
+)
+def test_main_summary_only_with_many_portfolios(
+    args: list[str], has_summary: bool
+) -> None:
+    result = CliRunner().invoke(main, args)
+    assert result.exit_code == 0, result.output
+    assert ("Resumo · objetivo: tempo" in result.output) == has_summary
+
+
+@pytest.mark.usefixtures("_restore_root_level")
+def test_main_shows_machine_table() -> None:
+    """A tabela tem uma linha por máquina e o resumo da carteira."""
+    result = CliRunner().invoke(main, ["-p", "1"])
+    assert result.exit_code == 0, result.output
+    for machine in ("Print01", "Print05", "Finish01", "Finish02"):
+        assert machine in result.output
+    assert "Ótimo do modelo: 67,75 h" in result.output
+    assert "Horizonte: 2 turnos de 10 h, T = 20 h" in result.output
+
+
+@pytest.mark.usefixtures("_restore_root_level")
+def test_main_uses_shift_hours_from_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """As horas do turno vêm de `settings` (que lê `SHIFT_HOURS` na
+    importação; aqui o objeto é trocado diretamente)."""
+    monkeypatch.setattr(
+        "printing_company.problem.analysis.settings",
+        Settings(shift_hours=8),
+    )
+    result = CliRunner().invoke(main, ["-p", "1"])
+    assert result.exit_code == 0, result.output
+    assert "Horizonte: 2 turnos de 8 h, T = 16 h" in result.output
+
+
+@pytest.mark.usefixtures("_restore_root_level")
+def test_main_debug_logs_model(caplog: pytest.LogCaptureFixture) -> None:
+    """Com --debug, o modelo de cada carteira vai para o log, antes dos
+    tableaux."""
+    with caplog.at_level(logging.DEBUG):
+        result = CliRunner().invoke(main, ["--debug", "-p", "1"])
+    assert result.exit_code == 0, result.output
+    names = [r.name for r in caplog.records if hasattr(r, RICH_TEXT)]
+    assert names[0] == "printing_company.problem.analysis"
+    assert (
+        caplog.records[0]
+        .getMessage()
+        .startswith("Modelo da Portfolio I (T = 20 h, objetivo: tempo)")
+    )
 
 
 def test_main_rejects_unknown_portfolio() -> None:
@@ -133,37 +192,21 @@ def test_solver_skips_rendering_without_debug(
         (["-o", "ENERGY"], "energia"),
     ],
 )
-def test_main_objective_option(
-    caplog: pytest.LogCaptureFixture, args: list[str], label: str
-) -> None:
-    with caplog.at_level(logging.INFO, logger="printing_company"):
-        result = CliRunner().invoke(main, [*args, "-p", "1"])
+def test_main_objective_option(args: list[str], label: str) -> None:
+    result = CliRunner().invoke(main, [*args, "-p", "1"])
     assert result.exit_code == 0, result.output
-    headers = [
-        r.getMessage()
-        for r in caplog.records
-        if r.getMessage().startswith(">>> ")
-    ]
-    assert headers == [f">>> Portfolio I: 2 turnos, objetivo: {label}"]
+    assert _titles(result.output) == [("Portfolio I", label)]
 
 
 @pytest.mark.usefixtures("_restore_root_level")
-def test_main_energy_objective_uses_less_energy(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+def test_main_energy_objective_uses_less_energy() -> None:
     """Minimizar a energia gasta menos kWh que minimizar o tempo."""
 
     def energy(objective: str) -> float:
-        caplog.clear()
-        with caplog.at_level(logging.INFO, logger="printing_company"):
-            result = CliRunner().invoke(main, ["-o", objective, "-p", "1"])
+        result = CliRunner().invoke(main, ["-o", objective, "-p", "1"])
         assert result.exit_code == 0, result.output
-        (summary,) = (
-            r.getMessage()
-            for r in caplog.records
-            if r.getMessage().startswith("Tempo real")
-        )
-        return float(summary.split("energia: ")[1].split(" kWh")[0])
+        (value,) = re.findall(r"energia: ([\d.,]+) kWh", result.output)
+        return _br_number(value)
 
     assert energy("energy") < energy("time")
 

@@ -38,7 +38,8 @@ capacidade (2) e (3) e as restrições de demanda (4) e (5):
   produção: $\sum_{i \in I} T_{im} z_{im} \leq T_m$. Todas as máquinas têm
   a mesma capacidade $T_m = T_n = T$, o número de horas de turno do
   horizonte de planejamento. No artigo, o turno é diário, de 8 horas mais
-  até 2 horas extras (`SHIFT_HOURS`), então $T = 10 d$ para $d$ dias;
+  até 2 horas extras (`printing_company.settings.Settings.shift_hours`),
+  então $T = 10 d$ para $d$ dias;
 - como o tempo por metro $T_{im} = 1 / v_m$ não depende do item, as
   variáveis podem ser agregadas por máquina:
   $z_m = \sum_{i \in I} z_{im}$ e $w_n = \sum_{i \in F} w_{in}$.
@@ -99,6 +100,7 @@ como um `simplex.Problem`.
 
 from collections.abc import Sequence
 from enum import StrEnum
+from typing import Self
 
 import numpy as np
 
@@ -111,19 +113,16 @@ from simplex import Constraint, Problem
 
 __all__ = [
     "SCALE",
-    "SHIFT_HOURS",
     "Objective",
     "build_problem",
     "min_capacity",
 ]
 
-SHIFT_HOURS = 8.0 + 2.0
-"""Horas de um turno diário no artigo: 8 horas normais mais até 2 horas
-extras. A capacidade de $d$ dias é `d * SHIFT_HOURS`."""
-
 SCALE = 1_000.0
 """Escala das restrições de demanda: velocidades e demandas entram no
-modelo em milhares de metros (por hora)."""
+modelo em milhares de metros (por hora). Fica aqui, e não em
+`printing_company.settings`, porque é parte da formulação (deixa os
+coeficientes na escala dos custos), e não um parâmetro do cenário."""
 
 
 class Objective(StrEnum):
@@ -136,6 +135,8 @@ class Objective(StrEnum):
     <Objective.ENERGY: 'energy'>
     >>> [str(o) for o in Objective]
     ['time', 'energy']
+    >>> Objective.ENERGY.label, Objective.ENERGY.unit
+    ('energia', 'kWh')
     """
 
     TIME = "time"
@@ -145,6 +146,24 @@ class Objective(StrEnum):
     ENERGY = "energy"
     r"""Consumo de energia, $\sum_m kw_m t_m$, em kWh (objetivo (1) do
     artigo, sem os setups e sem a tarifa)."""
+
+    @property
+    def label(self: Self) -> str:
+        """Nome do objetivo em português, para a saída do comando."""
+        match self:
+            case Objective.TIME:
+                return "tempo"
+            case Objective.ENERGY:
+                return "energia"
+
+    @property
+    def unit(self: Self) -> str:
+        """Unidade do valor ótimo: horas (`h`) ou kWh."""
+        match self:
+            case Objective.TIME:
+                return "h"
+            case Objective.ENERGY:
+                return "kWh"
 
 
 def build_problem(
@@ -188,7 +207,8 @@ def build_problem(
     - `printers`: as impressoras $m \in M$;
     - `finishings`: as máquinas de acabamento $n \in N$;
     - `capacity`: a capacidade $T$, em horas, de cada máquina no horizonte
-      (por exemplo, `2 * SHIFT_HOURS` para dois dias). Com `None`, as
+      (por exemplo, `2 * settings.shift_hours` para dois dias, com o
+      `printing_company.settings.settings`). Com `None`, as
       restrições de capacidade não entram no modelo;
     - `objective`: o que minimizar, o tempo (padrão) ou a energia.
 
@@ -287,11 +307,12 @@ def build_problem(
     `Finish02`. O tempo total sobe de 61,85 h para 67,75 h, porque parte
     da impressão foi para máquinas mais lentas:
 
+    >>> from printing_company.settings import settings
     >>> problem = build_problem(
     ...     portfolio=data.portfolios[0],
     ...     printers=data.printers,
     ...     finishings=data.finishers,
-    ...     capacity=2 * SHIFT_HOURS,
+    ...     capacity=2 * settings.shift_hours,
     ... )
     >>> solution = problem.solve()
     >>> {
@@ -349,7 +370,7 @@ def build_problem(
     ...     portfolio=data.portfolios[0],
     ...     printers=data.printers,
     ...     finishings=data.finishers,
-    ...     capacity=2 * SHIFT_HOURS,
+    ...     capacity=2 * settings.shift_hours,
     ...     objective=Objective.ENERGY,
     ... )
     >>> solution = problem.solve()
@@ -448,7 +469,8 @@ def min_capacity(
 
     **Exemplo:** na carteira I do artigo, as impressoras juntas fazem
     42 900 m/h, e os 543 000 m levam pelo menos 12,66 h. Um único turno
-    (`SHIFT_HOURS`, 10 h) não basta; dois bastam.
+    (`printing_company.settings.Settings.shift_hours`, 10 h) não basta;
+    dois bastam.
 
     >>> from printing_company.problem import data
     >>> [
@@ -464,7 +486,8 @@ def min_capacity(
     ... ]
     [12.66, 27.11, 60.85]
     >>> import math
-    >>> math.ceil(12.66 / SHIFT_HOURS)  # turnos diários para a carteira I
+    >>> from printing_company.settings import settings
+    >>> math.ceil(12.66 / settings.shift_hours)  # turnos diários para a carteira I
     2
     """
     printing = portfolio.total / sum(printer.speed for printer in printers)

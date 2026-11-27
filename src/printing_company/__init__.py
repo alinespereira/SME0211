@@ -14,11 +14,15 @@ de operação das máquinas ou o consumo de energia (veja
 - `printing_company.problem`: os dados do problema (máquinas e carteiras
   de pedidos), em `printing_company.problem.spec`, e as instâncias do
   artigo, em `printing_company.problem.data`;
-- `printing_company.settings`: caminhos do projeto.
+- `printing_company.settings`: caminhos do projeto e os parâmetros do
+  cenário (horas de um turno e tarifa de energia);
+- `printing_company.report`: as tabelas que o comando mostra.
 
 **Comando:** `printing-company` (a função `main`) resolve as três
-carteiras do artigo. Com `--debug`, mostra também o tableau de cada
-iteração do simplex, com a variável que entra, a que sai e o pivô em
+carteiras do artigo e mostra, para cada uma, uma tabela com as horas, o
+tempo real e a energia de cada máquina, e no fim um resumo que compara as
+carteiras (veja `printing_company.report`). Com `--debug`, mostra também
+o modelo e o tableau de cada iteração do simplex, com a variável que entra, a que sai e o pivô em
 destaque (veja `simplex.display`). Os tableaux da Fase 1 só aparecem com
 `--phase-one`. Com `--objective energy`, minimiza o consumo de energia
 em vez do tempo:
@@ -28,6 +32,7 @@ uv run printing-company --debug              # as três carteiras
 uv run printing-company --debug --portfolio 2  # só a Portfolio II
 uv run printing-company --debug --phase-one    # inclui a Fase 1
 uv run printing-company --objective energy     # minimiza a energia
+SHIFT_HOURS=8 uv run printing-company          # turnos de 8 h
 ```
 
 **Exemplo:** a primeira carteira de pedidos do artigo.
@@ -39,33 +44,14 @@ uv run printing-company --objective energy     # minimiza a energia
 ('Portfolio II', 20)
 """
 
-import logging
-import math
-
 import click
+from rich.console import Console
 
-from printing_company.problem.analysis import (
-    energy_consumption,
-    energy_cost,
-    operating_times,
-)
+from printing_company.problem.analysis import PortfolioResult, solve_portfolio
 from printing_company.problem.data import finishers, portfolios, printers
-from printing_company.problem.model import (
-    SHIFT_HOURS,
-    Objective,
-    build_problem,
-    min_capacity,
-)
-from printing_company.settings import Settings
-from simplex import PivotingRule, Solver, configure_logging
-
-logger = logging.getLogger(__name__)
-
-settings = Settings()
-"""Configurações do projeto, carregadas na importação."""
-
-objective_label = {Objective.TIME: "tempo", Objective.ENERGY: "energia"}
-"""Nome de cada objetivo nos logs do comando."""
+from printing_company.problem.model import Objective
+from printing_company.report import portfolio_report, summary_table
+from simplex import configure_logging
 
 
 @click.command()
@@ -73,8 +59,9 @@ objective_label = {Objective.TIME: "tempo", Objective.ENERGY: "energia"}
     "--debug",
     is_flag=True,
     help=(
-        "Mostra os logs de DEBUG, com o tableau de cada iteração do "
-        "simplex (variável que entra, que sai e pivô em destaque)."
+        "Mostra também o modelo de cada carteira e os logs de DEBUG, com o "
+        "tableau de cada iteração do simplex (variável que entra, que sai "
+        "e pivô em destaque)."
     ),
 )
 @click.option(
@@ -118,53 +105,30 @@ def main(
     a 3, na ordem do artigo). Com `--objective`, escolhe se minimiza o
     tempo de operação (padrão) ou o consumo de energia. Cada carteira é
     resolvida com o menor número de turnos diários que a torna viável;
-    para cada uma, mostra o tempo real (com setup), o consumo e o custo
-    de energia.
+    para cada uma, mostra as horas, o tempo real (com setup), a energia
+    de cada máquina e o custo. As horas de um turno vêm da variável de
+    ambiente SHIFT_HOURS (padrão: 10).
     """
     # A docstring acima é a ajuda do comando (`printing-company --help`).
-    # Veja `SHIFT_HOURS`, `min_capacity` e `printing_company.problem.analysis`.
+    # Veja `printing_company.problem.analysis.solve_portfolio` e
+    # `printing_company.report`.
     configure_logging(debug=debug, phase_one=phase_one)
+    console = Console()
     chosen = sorted(set(selected)) or range(1, len(portfolios) + 1)
-    for portfolio in (portfolios[k - 1] for k in chosen):
-        days = math.ceil(
-            min_capacity(
-                portfolio=portfolio,
-                printers=printers,
-                finishings=finishers,
-            )
-            / SHIFT_HOURS
-        )
-        problem = build_problem(
-            portfolio=portfolio,
+    results: list[PortfolioResult] = []
+    for k in chosen:
+        result = solve_portfolio(
+            portfolio=portfolios[k - 1],
             printers=printers,
             finishings=finishers,
-            capacity=days * SHIFT_HOURS,
             objective=objective,
         )
-        logger.info(
-            f">>> {portfolio.label}: {days} turnos, "
-            f"objetivo: {objective_label[objective]}"
-        )
-        logger.info(problem)
-        solver = Solver(rule=PivotingRule.LEXICOGRAPHIC)
-        solution = problem.solve(solver=solver)
-        logger.info(solution.model_dump(exclude={"result"}))
-        if solution.x is None:
-            continue
-        machines = [*printers, *finishers]
-        hours = dict(
-            zip(problem.variable_names, solution.x.tolist(), strict=True)
-        )
-        times = operating_times(hours=hours, machines=machines)
-        energy = energy_consumption(times=times, machines=machines)
-        logger.info(
-            {name: round(tau, 2) for name, tau in times.items() if tau > 0}
-        )
-        logger.info(
-            f"Tempo real: {sum(times.values()):.2f} h; "
-            f"energia: {sum(energy.values()):.2f} kWh; "
-            f"custo: R$ {energy_cost(energy=energy):.2f}"
-        )
+        console.print()
+        console.print(portfolio_report(result=result))
+        results.append(result)
+    if len(results) > 1:
+        console.print()
+        console.print(summary_table(results=results))
 
 
 if __name__ == "__main__":
