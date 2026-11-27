@@ -30,6 +30,7 @@ Para resolvê-lo com o simplex, o caminho é:
 `Problem.solve` junta os quatro passos.
 """
 
+import logging
 import tomllib
 from pathlib import Path
 from typing import Literal, Self
@@ -38,6 +39,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from simplex.defaults import TOLERANCE
+from simplex.logs import PHASE_ONE_LOGGER
 from simplex.solver import Result, Solver, Status
 from simplex.tableau import FloatArray, Matrix, Tableau, Vector
 
@@ -341,6 +343,8 @@ class StandardForm(BaseModel):
 
     >>> sf.phase_one_tableau().basis
     (5, 6, 7)
+    >>> sf.phase_one_tableau().variable_names[5:]
+    ('y1', 'y2', 'y3')
     >>> t = sf.initial_tableau(solver=Solver())
     >>> all(j < 5 for j in t.basis)
     True
@@ -410,7 +414,8 @@ class StandardForm(BaseModel):
 
         A matriz é $[\tilde{A} \;|\; I_m]$, os custos são $(0, \dots, 0,
         1, \dots, 1)$ e a base inicial são as artificiais (colunas $N$ a
-        $N + m - 1$), viável porque $\tilde{b} \geq 0$ e $B = I_m$.
+        $N + m - 1$, chamadas `y1`, ..., `ym`), viável porque
+        $\tilde{b} \geq 0$ e $B = I_m$.
         """
         num_constraints, num_variables = self.A.shape
         A = np.hstack([self.A, np.eye(num_constraints)])  # noqa: N806
@@ -418,12 +423,19 @@ class StandardForm(BaseModel):
         # Custo 0 nas variáveis da forma padrão e 1 nas artificiais.
         c = np.concatenate([np.zeros(num_variables), np.ones(num_constraints)])
         basis = tuple(range(num_variables, num_variables + num_constraints))
-        return Tableau(A=A, b=b, c=c, basis=basis)
+        # As artificiais se chamam y1, ..., ym, como nas fórmulas acima
+        # (com um "_" na frente se o nome já for usado por outra coluna).
+        artificial = [f"y{i + 1}" for i in range(num_constraints)]
+        while set(artificial) & set(self.names):
+            artificial = [f"_{name}" for name in artificial]
+        names = (*self.names, *artificial)
+        return Tableau(A=A, b=b, c=c, basis=basis, names=names)
 
     def initial_tableau(self: Self, *, solver: Solver) -> Tableau | None:
         r"""Fase 1: encontra uma base viável para a forma padrão.
 
-        1. Resolva o problema auxiliar (`phase_one_tableau`) com `solver`.
+        1. Resolva o problema auxiliar (`phase_one_tableau`) com `solver`
+           (os tableaux vão para o logger `simplex.logs.PHASE_ONE_LOGGER`).
         2. Se o custo ótimo for positivo (maior que `TOLERANCE`), o
            problema original é inviável: devolva `None`.
         3. Senão, todas as artificiais valem zero. Se alguma artificial
@@ -442,7 +454,10 @@ class StandardForm(BaseModel):
         num_constraints, num_variables = self.A.shape
 
         # 1. Resolve o problema auxiliar.
-        tableau = solver.solve(tableau=self.phase_one_tableau()).tableau
+        tableau = solver.solve(
+            tableau=self.phase_one_tableau(),
+            log=logging.getLogger(PHASE_ONE_LOGGER),
+        ).tableau
 
         # 2. Custo ótimo positivo: alguma artificial não pode ser zerada.
         if tableau.objective_value > TOLERANCE:
@@ -474,6 +489,7 @@ class StandardForm(BaseModel):
             b=self.b[keep],
             c=self.c,
             basis=tuple(basis[i] for i in keep),
+            names=self.names,
         )
 
     # ------------------------------------------------------------------
