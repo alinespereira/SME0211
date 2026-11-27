@@ -20,9 +20,10 @@ B = \begin{bmatrix} A_{B(1)} & \cdots & A_{B(m)} \end{bmatrix}
 \in \mathbb{R}^{m \times m},
 $$
 
-em que $A_j$ é a $j$-ésima coluna de $A$. A solução básica associada tem
-$x_B = B^{-1} b$ e as variáveis não básicas iguais a zero; ela é viável
-quando $x_B \geq 0$.
+em que $A_j$ é a $j$-ésima coluna de $A$. A solução básica associada é o vetor
+$x \in \mathbb{R}^n$ com $x_B = B^{-1} b \in \mathbb{R}^m$ nas variáveis
+básicas e $x_N = 0$ nas $n - m$ não básicas; ela é viável quando
+$x_B \geq 0$.
 
 O tableau completo (aula 19) associado à base é
 
@@ -46,8 +47,10 @@ e da base:
 
 - `Tableau.B`: $B = \begin{bmatrix} A_{B(1)} & \cdots & A_{B(m)} \end{bmatrix}$;
 - `Tableau.basic_costs`: $c_B = (c_{B(1)}, \dots, c_{B(m)})$;
-- `Tableau.basic_solution`: $x_B = B^{-1} b$ (coluna 0 do tableau);
-- `Tableau.multipliers`: $p^\top = c_B^\top B^{-1}$;
+- `Tableau.basic_solution`: $x_B = B^{-1} b \in \mathbb{R}^m$, só os
+  valores das básicas (coluna 0 do tableau);
+- `Tableau.multipliers`: o vetor multiplicador $p \in \mathbb{R}^m$,
+  $p^\top = c_B^\top B^{-1}$;
 - `Tableau.reduced_costs`: $\bar{c}^\top = c^\top - c_B^\top B^{-1} A =
   c^\top - p^\top A$, ou seja, $\bar{c}_j = c_j - p^\top A_j$ (linha 0
   do tableau). Os das variáveis básicas são zero; se $\bar{c}_j \geq 0$
@@ -55,8 +58,8 @@ e da base:
 - `Tableau.column`: $u = B^{-1} A_j$. Quando $x_j$ entra na base, $u$ é a
   coluna pivô, usada no teste da razão
   $\theta^* = \min_{u_i > 0} x_{B(i)} / u_i$;
-- `Tableau.solution`: $x \in \mathbb{R}^n$, com $x_B = B^{-1} b$ e as não
-  básicas iguais a zero;
+- `Tableau.solution`: a solução atual completa, $x \in \mathbb{R}^n$, com
+  $x_B = B^{-1} b \in \mathbb{R}^m$ nas básicas e $x_N = 0$;
 - `Tableau.objective_value`: $c^\top x = c_B^\top x_B$;
 - `Tableau.table`: o tableau completo, uma matriz $(m + 1) \times (n + 1)$,
   $\begin{bmatrix} -c_B^\top x_B & \bar{c}^\top \cr x_B & B^{-1} A \end{bmatrix}$.
