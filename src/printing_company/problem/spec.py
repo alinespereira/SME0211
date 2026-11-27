@@ -26,8 +26,8 @@ from pydantic import BaseModel, ConfigDict, PositiveFloat, computed_field
 class Machine(BaseModel, ABC):
     r"""Máquina da gráfica (classe base abstrata).
 
-    Guarda os dados comuns às máquinas de impressão (`Printer`) e de
-    acabamento (`Finishing`). Não pode ser instanciada diretamente: use uma
+    Guarda os dados comuns às máquinas de impressão (`PrintingMachine`) e de
+    acabamento (`FinishingMachine`). Não pode ser instanciada diretamente: use uma
     das subclasses.
 
     **Exemplo:**
@@ -39,10 +39,10 @@ class Machine(BaseModel, ABC):
 
     Os três números precisam ser positivos:
 
-    >>> Printer(id="P1", speed=0, setup=30, consumption=50)  # doctest: +ELLIPSIS
+    >>> PrintingMachine(id="P1", speed=0, setup=30, consumption=50)  # doctest: +ELLIPSIS
     Traceback (most recent call last):
         ...
-    pydantic_core._pydantic_core.ValidationError: 1 validation error for Printer
+    pydantic_core._pydantic_core.ValidationError: 1 validation error for PrintingMachine
     speed
       Input should be greater than 0 ...
     """
@@ -74,21 +74,21 @@ class Machine(BaseModel, ABC):
         super().__init__(**data)
 
 
-class Printer(Machine):
+class PrintingMachine(Machine):
     r"""Máquina de impressão $m \in M$. Todo item passa por uma delas.
 
     **Exemplo:** uma impressora que imprime 200 m/min, com setup médio de
     30 minutos e consumo de 50 kWh.
 
-    >>> p = Printer(id="P1", speed=200, setup=30, consumption=50)
+    >>> p = PrintingMachine(id="P1", speed=200, setup=30, consumption=50)
     >>> p
-    Printer(id='P1', speed=200.0, setup=30.0, consumption=50.0)
+    PrintingMachine(id='P1', speed=200.0, setup=30.0, consumption=50.0)
     >>> 1 / p.speed  # tempo por metro, em minutos
     0.005
     >>> p.speed = 300  # doctest: +ELLIPSIS
     Traceback (most recent call last):
         ...
-    pydantic_core._pydantic_core.ValidationError: 1 validation error for Printer
+    pydantic_core._pydantic_core.ValidationError: 1 validation error for PrintingMachine
     speed
       Instance is frozen ...
     """
@@ -97,14 +97,14 @@ class Printer(Machine):
     pass
 
 
-class Finishing(Machine):
+class FinishingMachine(Machine):
     r"""Máquina de acabamento $n \in N$. Só os itens que exigem acabamento
     (`Demand.requires_finishing`) passam por uma delas, depois de
     impressos.
 
     **Exemplo:**
 
-    >>> f = Finishing(id="A1", speed=100, setup=15, consumption=20)
+    >>> f = FinishingMachine(id="A1", speed=100, setup=15, consumption=20)
     >>> f.setup
     15.0
     >>> isinstance(f, Machine)
@@ -145,6 +145,7 @@ class Portfolio(BaseModel):
     **Exemplo:**
 
     >>> portfolio = Portfolio(
+    ...     label="Escritório",
     ...     demands=[
     ...         Demand(label="notas fiscais", quantity=800),
     ...         Demand(label="formulários", quantity=1500, requires_finishing=True),
@@ -163,6 +164,9 @@ class Portfolio(BaseModel):
     """
 
     model_config = ConfigDict(frozen=True)
+
+    label: str
+    """Nome do item (por exemplo, o tipo de formulário)."""
 
     demands: list[Demand]
     """Demandas dos itens, na ordem em que foram pedidos."""
