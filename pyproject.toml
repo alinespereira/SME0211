@@ -1,7 +1,7 @@
 [project]
 name = "printing-company"
 version = "0.1.0"
-description = "Add your description here"
+description = "Otimização do tempo de impressão de uma gráfica com o método simplex (trabalho de SME0211)"
 readme = "README.md"
 authors = [{ name = "Aline", email = "line.asramos@gmail.com" }]
 requires-python = ">=3.12"
