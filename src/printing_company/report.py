@@ -14,7 +14,12 @@ from rich.text import Text
 from printing_company.problem.analysis import MachineResult, PortfolioResult
 from simplex import Status
 
-__all__ = ["format_br", "portfolio_report", "summary_table"]
+__all__ = [
+    "format_br",
+    "format_duration",
+    "portfolio_report",
+    "summary_table",
+]
 
 _IDLE = "—"
 """O que aparece nas colunas de uma máquina desligada."""
@@ -26,6 +31,20 @@ def format_br(*, value: float, digits: int = 2) -> str:
     if text.lstrip("-").strip("0.,") == "":
         text = text.lstrip("-")
     return text.translate(str.maketrans(",.", ".,"))
+
+
+def format_duration(*, seconds: float) -> str:
+    """Formata uma duração no padrão brasileiro: em milissegundos, com uma
+    casa decimal, abaixo de 1 s, e em segundos, com duas, a partir dele.
+
+    >>> format_duration(seconds=0.01234)
+    '12,3 ms'
+    >>> format_duration(seconds=2.5)
+    '2,50 s'
+    """
+    if seconds < 1:
+        return f"{format_br(value=1000 * seconds, digits=1)} ms"
+    return f"{format_br(value=seconds)} s"
 
 
 def _machine_row(
@@ -120,13 +139,14 @@ def _totals_table(*, result: PortfolioResult) -> Table:
     assert result.objective_value is not None
     table = Table(header_style="bold")
     table.add_column("Ótimo do modelo", justify="right", style="bold green")
-    for header in ("Tempo real (h)", "Energia (kWh)", "Custo (R$)"):
+    for header in ("Tempo real (h)", "Energia (kWh)", "Custo (R$)", "Simplex"):
         table.add_column(header, justify="right")
     table.add_row(
         f"{format_br(value=result.objective_value)} {result.objective.unit}",
         format_br(value=result.total_time),
         format_br(value=result.total_energy),
         format_br(value=result.cost),
+        format_duration(seconds=result.solve_seconds),
     )
     return table
 
@@ -140,14 +160,16 @@ def summary_table(*, results: Sequence[PortfolioResult]) -> Table:
     table = Table(
         title=title,
         header_style="bold",
-        caption="ótimo: valor do modelo · τ: tempo real · E: energia",
+        caption="τ: tempo real · E: energia · simplex: duração da solução",
         caption_justify="left",
     )
     many = len(objectives) > 1
     columns = [
         "Carteira",
         *(["objetivo"] if many else []),
-        *("ótimo", "τ (h)", "E (kWh)", "custo (R$)"),
+        # O custo (0,86 E) fica na tabela de cada carteira: aqui ele
+        # repetiria a energia e não deixaria o resumo caber em 80 colunas.
+        *("ótimo", "τ (h)", "E (kWh)", "simplex"),
     ]
     for header in columns:
         table.add_column(
@@ -165,13 +187,20 @@ def summary_table(*, results: Sequence[PortfolioResult]) -> Table:
             *([r.objective.label] if many else []),
         ]
         if r.status != Status.OPTIMAL or r.objective_value is None:
-            table.add_row(*fixed, str(r.status), "", "", "", style="red")
+            table.add_row(
+                *fixed,
+                str(r.status),
+                "",
+                "",
+                format_duration(seconds=r.solve_seconds),
+                style="red",
+            )
             continue
         table.add_row(
             *fixed,
             f"{format_br(value=r.objective_value)} {r.objective.unit}",
             format_br(value=r.total_time),
             format_br(value=r.total_energy),
-            format_br(value=r.cost),
+            format_duration(seconds=r.solve_seconds),
         )
     return table
