@@ -121,6 +121,52 @@ class Tableau(BaseModel):
     Guarda $A$, $b$, $c$ e os índices da base; as demais grandezas ($B$,
     $x_B$, $p$, custos reduzidos, colunas do tableau, ...) são calculadas a
     partir deles.
+
+    **Exemplo:** o problema
+
+    $$
+    \begin{aligned}
+    \min \quad & -x_1 - 2 x_2 \cr
+    \text{s.a.} \quad & x_1 + x_2 + x_3 = 4, \cr
+    & x_1 + 3 x_2 + x_4 = 6, \cr
+    & x \geq 0,
+    \end{aligned}
+    $$
+
+    na base das folgas $x_3$ e $x_4$ (índices 2 e 3 no código):
+
+    >>> t = Tableau(
+    ...     A=[[1, 1, 1, 0], [1, 3, 0, 1]],
+    ...     b=[4, 6],
+    ...     c=[-1, -2, 0, 0],
+    ...     basis=(2, 3),
+    ... )
+    >>> t.basic_solution.tolist()
+    [4.0, 6.0]
+    >>> t.solution.tolist()
+    [0.0, 0.0, 4.0, 6.0]
+    >>> t.reduced_costs.tolist()
+    [-1.0, -2.0, 0.0, 0.0]
+    >>> t.column(j=1).tolist()
+    [1.0, 3.0]
+    >>> for row in t.table:
+    ...     print(row.tolist())
+    [0.0, -1.0, -2.0, 0.0, 0.0]
+    [4.0, 1.0, 1.0, 1.0, 0.0]
+    [6.0, 1.0, 3.0, 0.0, 1.0]
+
+    Trocando para a base $\lbrace x_1, x_2 \rbrace$, que é a ótima (todos
+    os custos reduzidos são não negativos):
+
+    >>> otimo = t.with_basis(basis=(0, 1))
+    >>> otimo.solution.tolist()
+    [3.0, 1.0, 0.0, 0.0]
+    >>> otimo.objective_value
+    -5.0
+    >>> otimo.reduced_costs.tolist()
+    [0.0, 0.0, 0.5, 0.5]
+    >>> t.basis  # o tableau original não muda
+    (2, 3)
     """
 
     # arbitrary_types_allowed: numpy.ndarray não é um tipo que o pydantic

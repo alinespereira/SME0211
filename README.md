@@ -68,7 +68,8 @@ Não é preciso ativar o ambiente virtual: basta prefixar os comandos com
 uv run pytest
 ```
 
-Os testes ficam em `tests/`. O log detalhado (nível DEBUG) de cada execução
+Os testes ficam em `tests/`. O pytest também roda os exemplos (doctests)
+das docstrings em `src/`. O log detalhado (nível DEBUG) de cada execução
 é gravado em `log/tests.log`.
 
 ## 4. Documentação

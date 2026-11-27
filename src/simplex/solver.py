@@ -94,7 +94,19 @@ class Status(StrEnum):
 
 
 class Result(BaseModel):
-    """Resultado de `Solver.solve`."""
+    """Resultado de `Solver.solve`.
+
+    **Exemplo:**
+
+    >>> t = Tableau(A=[[1, 1]], b=[2], c=[1, 0], basis=(0,))
+    >>> result = Solver().solve(tableau=t)
+    >>> result.status
+    <Status.OPTIMAL: 'optimal'>
+    >>> result.iterations
+    1
+    >>> result.tableau.basis
+    (1,)
+    """
 
     status: Status
     """Como o método terminou."""
@@ -110,14 +122,43 @@ class Result(BaseModel):
 class Solver(BaseModel):
     r"""Método simplex parametrizado pela regra anticiclagem.
 
-    Exemplo de uso:
-
-        solver = Solver(rule=PivotingRule.BLAND)
-        result = solver.solve(tableau=tableau)
-
     Os métodos públicos correspondem aos passos do método descritos no
     módulo; os métodos `_entering_*` e `_leaving_*` implementam a parte de
     cada passo que depende da regra.
+
+    **Exemplo:** o mesmo problema do exemplo de `simplex.tableau.Tableau`,
+    partindo da base das folgas.
+
+    >>> t = Tableau(
+    ...     A=[[1, 1, 1, 0], [1, 3, 0, 1]],
+    ...     b=[4, 6],
+    ...     c=[-1, -2, 0, 0],
+    ...     basis=(2, 3),
+    ... )
+    >>> solver = Solver(rule=PivotingRule.BLAND)
+
+    Os passos de uma iteração, um de cada vez:
+
+    >>> solver.is_optimal(tableau=t)
+    False
+    >>> j = solver.entering_variable(tableau=t)  # menor j com custo < 0
+    >>> j
+    0
+    >>> u = t.column(j=j)
+    >>> solver.leaving_row(tableau=t, u=u)  # razões 4/1 e 6/1
+    0
+    >>> solver.change_basis(tableau=t, j=0, ell=0).basis
+    (0, 3)
+
+    O método completo:
+
+    >>> result = solver.solve(tableau=t)
+    >>> result.status
+    <Status.OPTIMAL: 'optimal'>
+    >>> result.tableau.solution.tolist()
+    [3.0, 1.0, 0.0, 0.0]
+    >>> result.tableau.objective_value
+    -5.0
     """
 
     model_config = ConfigDict(frozen=True)
