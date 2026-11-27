@@ -1,0 +1,28 @@
+# Exemplo pequeno para simplex.problem.Problem.from_toml.
+#
+#   max  3 x1 + 2 x2
+#   s.a.   x1 +   x2 <= 4
+#          x1 + 3 x2 <= 6
+#          x1        >= 1
+#          x1, x2 >= 0
+#
+# Ótimo: x1 = 4, x2 = 0, valor 12.
+
+sense = "max"
+c = [3, 2]
+names = ["x1", "x2"]
+
+[[constraints]]
+coefs = [1, 1]
+sense = "<="
+rhs = 4
+
+[[constraints]]
+coefs = [1, 3]
+sense = "<="
+rhs = 6
+
+[[constraints]]
+coefs = [1, 0]
+sense = ">="
+rhs = 1

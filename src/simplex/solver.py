@@ -87,6 +87,11 @@ class Status(StrEnum):
     ITERATION_LIMIT = "iteration_limit"
     """O número máximo de iterações foi atingido antes de uma conclusão."""
 
+    INFEASIBLE = "infeasible"
+    """A Fase 1 mostrou que não há solução viável (usado por
+    `simplex.problem.Problem.solve`; o `Solver` sozinho não devolve este
+    status, porque sempre parte de uma base viável)."""
+
 
 class Result(BaseModel):
     """Resultado de `Solver.solve`."""
