@@ -231,7 +231,23 @@ class Problem(BaseModel):
         **Devolve:** uma `Solution`. Se a Fase 1 mostrar que o problema é
         inviável, o status é `Status.INFEASIBLE`.
         """
-        raise NotImplementedError
+        solver = solver if solver is not None else Solver()
+        standard = self.to_standard_form()
+
+        # Fase 1: base viável inicial (ou prova de inviabilidade).
+        tableau = standard.initial_tableau(solver)
+        if tableau is None:
+            return Solution(status=Status.INFEASIBLE)
+
+        # Fase 2: o simplex a partir dessa base.
+        result = solver.solve(tableau)
+        final = result.tableau
+        return Solution(
+            status=result.status,
+            x=standard.original_solution(final.solution),
+            objective=standard.original_objective(final.objective_value),
+            result=result,
+        )
 
 
 class StandardForm(BaseModel):
@@ -307,7 +323,8 @@ class StandardForm(BaseModel):
         num_constraints, num_variables = self.A.shape
         A = np.hstack([self.A, np.eye(num_constraints)])  # noqa: N806
         b = self.b
-        c = self.c
+        # Custo 0 nas variáveis da forma padrão e 1 nas artificiais.
+        c = np.concatenate([np.zeros(num_variables), np.ones(num_constraints)])
         basis = tuple(range(num_variables, num_variables + num_constraints))
         return Tableau(A=A, b=b, c=c, basis=basis)
 
@@ -330,7 +347,42 @@ class StandardForm(BaseModel):
         Na troca do passo 3 o pivô pode ser negativo, mas como a
         artificial vale zero a solução continua viável.
         """
-        raise NotImplementedError
+        num_constraints, num_variables = self.A.shape
+
+        # 1. Resolve o problema auxiliar.
+        tableau = solver.solve(self.phase_one_tableau()).tableau
+
+        # 2. Custo ótimo positivo: alguma artificial não pode ser zerada.
+        if tableau.objective_value > TOLERANCE:
+            return None
+
+        # 3. Tira da base as artificiais que sobraram (todas valem zero).
+        basis = list(tableau.basis)
+        redundant: list[int] = []
+        for ell in range(num_constraints):
+            if basis[ell] < num_variables:
+                continue
+            # Linha ell de B^{-1} [A | I], só nas colunas originais.
+            row = np.linalg.solve(tableau.B, tableau.A)[ell, :num_variables]
+            candidates = [
+                j
+                for j in range(num_variables)
+                if j not in basis and abs(row[j]) > TOLERANCE
+            ]
+            if candidates:
+                basis[ell] = candidates[0]
+                tableau = tableau.with_basis(basis)
+            else:
+                redundant.append(ell)
+
+        # 4. Remove as linhas redundantes e volta aos dados originais.
+        keep = [i for i in range(num_constraints) if i not in redundant]
+        return Tableau(
+            A=self.A[keep],
+            b=self.b[keep],
+            c=self.c,
+            basis=tuple(basis[i] for i in keep),
+        )
 
     # ------------------------------------------------------------------
     # Volta ao problema original
@@ -339,12 +391,12 @@ class StandardForm(BaseModel):
     def original_solution(self: Self, x: FloatArray) -> FloatArray:
         r"""Restringe uma solução $\tilde{x}$ da forma padrão às $n$
         variáveis originais (descarta folgas e excessos)."""
-        raise NotImplementedError
+        return x[: self.num_original]
 
     def original_objective(self: Self, value: float) -> float:
         r"""Converte o valor $\tilde{c}^\top \tilde{x}$ no valor da função
         objetivo original, multiplicando por `objective_sign`."""
-        raise NotImplementedError
+        return self.objective_sign * value
 
 
 class Solution(BaseModel):
