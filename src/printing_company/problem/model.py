@@ -48,7 +48,7 @@ elas valem com igualdade, como as restrições (4) e (5) do artigo.
 
 O problema é viável se, e só se, as máquinas dão conta da demanda no
 horizonte: $T \sum_m v_m \geq \sum_{i \in I} D_i$ e
-$T \sum_n v_n \geq \sum_{i \in F} D_i$. Sem as capacidades
+$T \sum_n v_n \geq \sum_{i \in F} D_i$ (veja `min_capacity`). Sem as capacidades
 (`capacity=None`), a solução ótima manda toda a impressão para a
 impressora mais rápida e todo o acabamento para a máquina de acabamento
 mais rápida; com elas, as máquinas são ocupadas da mais rápida para a mais
@@ -67,7 +67,7 @@ from printing_company.problem.spec import (
 )
 from simplex import Constraint, Problem
 
-__all__ = ["SHIFT_HOURS", "build_problem"]
+__all__ = ["SHIFT_HOURS", "build_problem", "min_capacity"]
 
 SHIFT_HOURS = 8.0 + 2.0
 """Horas de um turno diário no artigo: 8 horas normais mais até 2 horas
@@ -294,3 +294,52 @@ def build_problem(
         ),
         names=names,
     )
+
+
+def min_capacity(
+    *,
+    portfolio: Portfolio,
+    printers: Sequence[PrintingMachine],
+    finishings: Sequence[FinishingMachine],
+) -> float:
+    r"""Menor capacidade $T$, em horas, para a qual o modelo é viável.
+
+    Com todas as máquinas trabalhando $T$ horas, as impressoras produzem
+    $T \sum_m v_m$ metros e as máquinas de acabamento, $T \sum_n v_n$.
+    Então o modelo de `build_problem` é viável se, e só se,
+
+    $$
+    T \geq T_{\min} = \max\left(
+        \frac{\sum_{i \in I} D_i}{\sum_{m \in M} v_m},
+        \frac{\sum_{i \in F} D_i}{\sum_{n \in N} v_n}
+    \right).
+    $$
+
+    **Exemplo:** na carteira I do artigo, as impressoras juntas fazem
+    42 900 m/h, e os 543 000 m levam pelo menos 12,66 h. Um único turno
+    (`SHIFT_HOURS`, 10 h) não basta; dois bastam.
+
+    >>> from printing_company.problem import data
+    >>> [
+    ...     round(
+    ...         min_capacity(
+    ...             portfolio=portfolio,
+    ...             printers=data.printers,
+    ...             finishings=data.finishers,
+    ...         ),
+    ...         2,
+    ...     )
+    ...     for portfolio in data.portfolios
+    ... ]
+    [12.66, 27.11, 60.85]
+    >>> import math
+    >>> math.ceil(12.66 / SHIFT_HOURS)  # turnos diários para a carteira I
+    2
+    """
+    printing = portfolio.total / sum(printer.speed for printer in printers)
+    finishing = (
+        portfolio.with_finishing / sum(f.speed for f in finishings)
+        if portfolio.with_finishing > 0
+        else 0.0
+    )
+    return max(printing, finishing)

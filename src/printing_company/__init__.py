@@ -25,11 +25,16 @@ modelo do artigo, focada no tempo de impressão, resolvida com o pacote
 """
 
 import logging
+import math
 
 from rich.logging import RichHandler
 
 from printing_company.problem.data import finishers, portfolios, printers
-from printing_company.problem.model import build_problem
+from printing_company.problem.model import (
+    SHIFT_HOURS,
+    build_problem,
+    min_capacity,
+)
 from printing_company.settings import Settings
 from simplex import PivotingRule, Solver
 
@@ -47,15 +52,25 @@ settings = Settings()
 
 
 def main() -> None:
-    """Ponto de entrada do comando `printing-company` (ainda não
-    implementado)."""
+    """Ponto de entrada do comando `printing-company`: resolve as três
+    carteiras do artigo, cada uma com o menor número de turnos diários
+    (`SHIFT_HOURS`) que a torna viável (veja `min_capacity`)."""
     for portfolio in portfolios:
+        days = math.ceil(
+            min_capacity(
+                portfolio=portfolio,
+                printers=printers,
+                finishings=finishers,
+            )
+            / SHIFT_HOURS
+        )
         problem = build_problem(
             portfolio=portfolio,
             printers=printers,
             finishings=finishers,
+            capacity=days * SHIFT_HOURS,
         )
-        logger.info(f">>> {portfolio.label}")
+        logger.info(f">>> {portfolio.label}: {days} turnos")
         solver = Solver(rule=PivotingRule.LEXICOGRAPHIC)
         logger.info(problem.to_standard_form().initial_tableau(solver=solver))
         solution = problem.solve(solver=solver)
