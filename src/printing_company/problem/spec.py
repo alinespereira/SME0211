@@ -172,9 +172,12 @@ class Portfolio(BaseModel):
         r"""Total, em metros, dos itens que precisam de acabamento:
         $\sum_{i \in F} D_i$."""
         return sum(
-            demand.quantity
-            for demand in self.demands
-            if demand.requires_finishing
+            (
+                demand.quantity
+                for demand in self.demands
+                if demand.requires_finishing
+            ),
+            start=0.0,
         )
 
     @computed_field
@@ -182,7 +185,10 @@ class Portfolio(BaseModel):
         r"""Total, em metros, dos itens que não precisam de acabamento:
         $\sum_{i \in I \setminus F} D_i$."""
         return sum(
-            demand.quantity
-            for demand in self.demands
-            if not demand.requires_finishing
+            (
+                demand.quantity
+                for demand in self.demands
+                if not demand.requires_finishing
+            ),
+            start=0.0,
         )
