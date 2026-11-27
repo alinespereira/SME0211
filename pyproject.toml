@@ -12,6 +12,7 @@ dependencies = [
     "pandas>=3.1.1",
     "pydantic>=2.14.3",
     "pydantic-settings>=2.16.2",
+    "rich>=15.0.0",
     "scipy>=1.18.1",
     "seaborn>=0.13.2",
 ]
@@ -33,5 +34,6 @@ dev = [
     "mypy>=2.4.1",
     "nbformat>=5.11.1",
     "pdoc>=16.0.0",
+    "pytest>=9.2.0",
     "ruff>=0.17.4",
 ]
