@@ -24,34 +24,42 @@ modelo do artigo, focada no tempo de impressão, resolvida com o pacote
 ('Portfolio II', 20)
 """
 
-from pathlib import Path
+import logging
 
-import click
+from rich.logging import RichHandler
 
+from printing_company.problem.data import finishers, portfolios, printers
+from printing_company.problem.model import build_problem
 from printing_company.settings import Settings
+from simplex import PivotingRule, Solver
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    datefmt="[%X]",
+    handlers=[RichHandler(rich_tracebacks=True, markup=True)],
+)
+
+logger = logging.getLogger(__name__)
 
 settings = Settings()
 """Configurações do projeto, carregadas na importação."""
 
 
-@click.command(help="Resolve o PL da dieta do almoço e imprime o resultado.")
-@click.option(
-    "--data-dir",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    default=settings.data_dir,
-    show_default="data/ na raiz do projeto",
-    help="Pasta com os CSVs.",
-)
-@click.option(
-    "--skip",
-    multiple=True,
-    metavar="NUTRIENTE",
-    help="Nutriente a retirar das restrições (ex.: calcio). Pode repetir.",
-)
-def main(*, data_dir: Path, skip: tuple[str, ...]) -> None:
+def main() -> None:
     """Ponto de entrada do comando `printing-company` (ainda não
     implementado)."""
-    raise NotImplementedError
+    for portfolio in portfolios:
+        problem = build_problem(
+            portfolio=portfolio,
+            printers=printers,
+            finishings=finishers,
+        )
+        logger.info(f">>> {portfolio.label}")
+        solver = Solver(rule=PivotingRule.LEXICOGRAPHIC)
+        logger.info(problem.to_standard_form().initial_tableau(solver=solver))
+        solution = problem.solve(solver=solver)
+        logger.info(solution)
 
 
 if __name__ == "__main__":
