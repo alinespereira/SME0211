@@ -32,6 +32,7 @@ Para resolvê-lo com o simplex, o caminho é:
 
 import logging
 import tomllib
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, Self
 
@@ -39,6 +40,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from simplex.defaults import TOLERANCE
+from simplex.display import format_number
 from simplex.logs import PHASE_ONE_LOGGER
 from simplex.solver import Result, Solver, Status
 from simplex.tableau import FloatArray, Matrix, Tableau, Vector
@@ -64,6 +66,41 @@ _FLIPPED_SENSE: dict[ConstraintSense, ConstraintSense] = {
     "==": "==",
 }
 """Sentido da restrição depois de multiplicá-la por $-1$."""
+
+
+def _linear_terms(
+    *, coefs: FloatArray, names: Sequence[str]
+) -> list[tuple[str, str]]:
+    r"""Os termos de $a^\top x$, um par `(sinal, termo)` por variável, para
+    alinhar em colunas.
+
+    O primeiro termo não nulo leva só o sinal `-` (se negativo), os
+    seguintes levam `" + "` ou `" - "`; coeficientes $\pm 1$ são omitidos
+    e os nulos viram `("", "")`.
+
+    >>> _linear_terms(coefs=np.array([1.0, -2.0, 0.0]), names=["x", "y", "z"])
+    [('', 'x'), (' - ', '2 y'), ('', '')]
+    >>> _linear_terms(coefs=np.array([0.0, -1.0, 0.5]), names=["x", "y", "z"])
+    [('', ''), ('-', 'y'), (' + ', '0.5 z')]
+    """
+    terms: list[tuple[str, str]] = []
+    first = True
+    for value, name in zip(coefs.tolist(), names, strict=True):
+        if abs(value) <= TOLERANCE:
+            terms.append(("", ""))
+            continue
+        magnitude = abs(value)
+        if abs(magnitude - 1) <= TOLERANCE:
+            term = name
+        else:
+            term = f"{format_number(value=magnitude)} {name}"
+        if first:
+            sign = "-" if value < 0 else ""
+        else:
+            sign = " - " if value < 0 else " + "
+        terms.append((sign, term))
+        first = False
+    return terms
 
 
 class Constraint(BaseModel):
@@ -177,6 +214,84 @@ class Problem(BaseModel):
         if self.names is not None:
             return self.names
         return tuple(f"x{j}" for j in range(1, self.num_variables + 1))
+
+    # ------------------------------------------------------------------
+    # Exibição
+    # ------------------------------------------------------------------
+
+    def __str__(self: Self) -> str:
+        r"""O problema como escrito no papel, com os termos alinhados por
+        variável.
+
+        Coeficientes $\pm 1$ aparecem só com o sinal, coeficientes nulos
+        deixam o espaço da variável em branco e os números usam
+        `simplex.display.format_number`.
+
+        **Exemplo:** o problema do exemplo da classe.
+
+        >>> p = Problem(
+        ...     sense="max",
+        ...     c=[3, 2],
+        ...     constraints=(
+        ...         Constraint(coefs=[1, 1], sense="<=", rhs=4),
+        ...         Constraint(coefs=[1, 3], sense="<=", rhs=6),
+        ...         Constraint(coefs=[1, 0], sense=">=", rhs=1),
+        ...     ),
+        ... )
+        >>> print(p)
+        max   3 x1 + 2 x2
+        s.a.    x1 +   x2 <= 4
+                x1 + 3 x2 <= 6
+                x1        >= 1
+              x1, x2 >= 0
+
+        Com nomes, coeficientes negativos e uma igualdade:
+
+        >>> q = Problem(
+        ...     c=[1, -0.5, 0],
+        ...     constraints=(
+        ...         Constraint(coefs=[-1, 2, 0], sense="==", rhs=-3),
+        ...         Constraint(coefs=[0, 1, -1], sense="<=", rhs=10),
+        ...     ),
+        ...     names=("a", "b", "c"),
+        ... )
+        >>> print(q)
+        min    a - 0.5 b
+        s.a.  -a +   2 b     = -3
+                       b - c <= 10
+              a, b, c >= 0
+        """
+        rows = [
+            self.c,
+            *(constraint.coefs for constraint in self.constraints),
+        ]
+        terms = [
+            _linear_terms(coefs=row, names=self.variable_names) for row in rows
+        ]
+        n = self.num_variables
+        sign_widths = [max(len(row[j][0]) for row in terms) for j in range(n)]
+        term_widths = [max(len(row[j][1]) for row in terms) for j in range(n)]
+
+        def expression(row: list[tuple[str, str]]) -> str:
+            return "".join(
+                sign.rjust(sw) + term.rjust(tw)
+                for (sign, term), sw, tw in zip(
+                    row, sign_widths, term_widths, strict=True
+                )
+            ).rstrip()
+
+        lines = [f"{self.sense:<4}  {expression(terms[0])}"]
+        body = [expression(row_terms) for row_terms in terms]
+        lhs_width = max(len(b) for b in body[1:])
+        for i, constraint in enumerate(self.constraints):
+            prefix = "s.a." if i == 0 else ""
+            sense = "=" if constraint.sense == "==" else constraint.sense
+            rhs = format_number(value=constraint.rhs)
+            lines.append(
+                f"{prefix:<4}  {body[i + 1].ljust(lhs_width)} {sense} {rhs}"
+            )
+        lines.append(f"{'':<4}  {', '.join(self.variable_names)} >= 0")
+        return "\n".join(line.rstrip() for line in lines)
 
     # ------------------------------------------------------------------
     # Leitura

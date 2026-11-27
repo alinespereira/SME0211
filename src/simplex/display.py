@@ -26,6 +26,7 @@ log e para os doctests) e as cores só no terminal (veja `simplex.logs`).
 
 from rich.text import Text
 
+from simplex.defaults import TOLERANCE
 from simplex.tableau import Tableau
 
 __all__ = [
@@ -52,15 +53,21 @@ _SEPARATOR = " │"
 def format_number(*, value: float) -> str:
     """Formata uma entrada do tableau com até 4 algarismos significativos.
 
-    Somar `0.0` evita imprimir `-0`.
+    Valores com módulo até `simplex.defaults.TOLERANCE` (resíduos de ponto
+    flutuante, como `-2.22e-16`) aparecem como `0`, e somar `0.0` evita
+    imprimir `-0`.
 
     >>> format_number(value=2 / 3)
     '0.6667'
     >>> format_number(value=-0.0)
     '0'
+    >>> format_number(value=-2.22e-16)
+    '0'
     >>> format_number(value=1500.0)
     '1500'
     """
+    if abs(value) <= TOLERANCE:
+        value = 0.0
     return f"{value + 0.0:.4g}"
 
 
