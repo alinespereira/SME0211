@@ -26,6 +26,7 @@ log e para os doctests) e as cores só no terminal (veja `simplex.logs`).
 
 from rich.text import Text
 
+from simplex.defaults import TOLERANCE
 from simplex.tableau import Tableau
 
 __all__ = [
@@ -61,6 +62,7 @@ def format_number(*, value: float) -> str:
     >>> format_number(value=1500.0)
     '1500'
     """
+    value = value if abs(value) > TOLERANCE else 0.0
     return f"{value + 0.0:.4g}"
 
 
