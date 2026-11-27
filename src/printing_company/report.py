@@ -10,8 +10,8 @@ Para cada carteira, `portfolio_report` mostra
   uso da capacidade $t / T$, o tempo real $\tau$ (com setup), os metros
   produzidos $v t$, a potência $kw$ e a energia $E = kw \, \tau$. As
   máquinas desligadas aparecem apagadas;
-- um resumo com o valor ótimo do modelo, o tempo real, a energia e o
-  custo.
+- uma tabela com o valor ótimo do modelo e os totais com setup: o tempo
+  real, a energia e o custo.
 
 Com mais de uma carteira, `summary_table` compara todas no fim. Os
 números seguem o padrão brasileiro (`format_br`): vírgula decimal e ponto
@@ -143,8 +143,11 @@ def portfolio_report(*, result: PortfolioResult) -> RenderableType:
     │ Total    │         │ 67,75 │      │ 69,17 │              │       │ 3.498,43 │
     └──────────┴─────────┴───────┴──────┴───────┴──────────────┴───────┴──────────┘
     t: horas do modelo · uso: t/T · τ: t + setup · E = kW·τ
-    Ótimo do modelo: 67,75 h
-    Tempo real: 69,17 h · energia: 3.498,43 kWh · custo: R$ 3.008,65
+    ┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
+    ┃ Ótimo do modelo ┃ Tempo real (h) ┃ Energia (kWh) ┃ Custo (R$) ┃
+    ┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
+    │         67,75 h │          69,17 │      3.498,43 │   3.008,65 │
+    └─────────────────┴────────────────┴───────────────┴────────────┘
     """
     portfolio = result.portfolio
     finishing_items = sum(d.requires_finishing for d in portfolio.demands)
@@ -167,18 +170,29 @@ def portfolio_report(*, result: PortfolioResult) -> RenderableType:
             header,
             Text(f"Sem solução ótima: {result.status}.", style="bold red"),
         )
-    summary = Text.assemble(
-        "Ótimo do modelo: ",
-        (
-            f"{format_br(value=result.objective_value)} "
-            f"{result.objective.unit}",
-            "bold green",
-        ),
-        f"\nTempo real: {format_br(value=result.total_time)} h"
-        f" · energia: {format_br(value=result.total_energy)} kWh"
-        f" · custo: R$ {format_br(value=result.cost)}",
+    return Group(
+        title,
+        header,
+        _machine_table(result=result),
+        _totals_table(result=result),
     )
-    return Group(title, header, _machine_table(result=result), summary)
+
+
+def _totals_table(*, result: PortfolioResult) -> Table:
+    """A tabela com o ótimo do modelo e os totais de uma carteira
+    resolvida (tempo real, energia e custo, com setup)."""
+    assert result.objective_value is not None
+    table = Table(header_style="bold")
+    table.add_column("Ótimo do modelo", justify="right", style="bold green")
+    for header in ("Tempo real (h)", "Energia (kWh)", "Custo (R$)"):
+        table.add_column(header, justify="right")
+    table.add_row(
+        f"{format_br(value=result.objective_value)} {result.objective.unit}",
+        format_br(value=result.total_time),
+        format_br(value=result.total_energy),
+        format_br(value=result.cost),
+    )
+    return table
 
 
 def summary_table(*, results: Sequence[PortfolioResult]) -> Table:

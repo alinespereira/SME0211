@@ -83,8 +83,9 @@ Cada carteira é resolvida com o menor número de turnos diários que a
 torna viável. Para cada uma, o comando mostra uma tabela com uma linha por
 máquina: a velocidade $v$, as horas de produção $t$ do modelo, o uso da
 capacidade $t/T$, o tempo real $\tau$ (com um setup por máquina ligada),
-os metros produzidos, a potência e a energia $E = kW \cdot \tau$. No fim,
-há o valor ótimo do modelo, o tempo real, a energia e o custo. Com mais de
+os metros produzidos, a potência e a energia $E = kW \cdot \tau$. Abaixo
+dela, outra tabela traz o valor ótimo do modelo, o tempo real, a energia e
+o custo. Com mais de
 uma carteira, uma tabela compara todas:
 
 ```text

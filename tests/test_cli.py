@@ -50,6 +50,16 @@ def _br_number(text: str) -> float:
     return float(text.replace(".", "").replace(",", "."))
 
 
+def _totals(output: str) -> tuple[float, ...]:
+    """O ótimo do modelo, o tempo real, a energia e o custo da tabela de
+    totais (a única linha com uma unidade na primeira coluna)."""
+    (row,) = re.findall(
+        r"│ +([\d.,]+) (?:h|kWh) │ +([\d.,]+) │ +([\d.,]+) │ +([\d.,]+) │",
+        output,
+    )
+    return tuple(_br_number(value) for value in row)
+
+
 @pytest.mark.usefixtures("_restore_root_level")
 @pytest.mark.parametrize(
     ("args", "labels"),
@@ -85,7 +95,7 @@ def test_main_shows_machine_table() -> None:
     assert result.exit_code == 0, result.output
     for machine in ("Print01", "Print05", "Finish01", "Finish02"):
         assert machine in result.output
-    assert "Ótimo do modelo: 67,75 h" in result.output
+    assert _totals(result.output) == (67.75, 69.17, 3498.43, 3008.65)
     assert "Horizonte: 2 turnos de 10 h, T = 20 h" in result.output
 
 
@@ -205,8 +215,7 @@ def test_main_energy_objective_uses_less_energy() -> None:
     def energy(objective: str) -> float:
         result = CliRunner().invoke(main, ["-o", objective, "-p", "1"])
         assert result.exit_code == 0, result.output
-        (value,) = re.findall(r"energia: ([\d.,]+) kWh", result.output)
-        return _br_number(value)
+        return _totals(result.output)[2]
 
     assert energy("energy") < energy("time")
 
