@@ -32,6 +32,7 @@ uv run printing-company --debug              # as três carteiras
 uv run printing-company --debug --portfolio 2  # só a Portfolio II
 uv run printing-company --debug --phase-one    # inclui a Fase 1
 uv run printing-company --objective energy     # minimiza a energia
+uv run printing-company -o time -o energy      # compara os dois objetivos
 SHIFT_HOURS=8 uv run printing-company          # turnos de 8 h
 ```
 
@@ -83,13 +84,16 @@ from simplex import configure_logging
 @click.option(
     "-o",
     "--objective",
+    "objectives",
     type=click.Choice(list(Objective), case_sensitive=False),
-    default=Objective.TIME.value,
+    multiple=True,
+    default=[Objective.TIME.value],
     show_default=True,
     help=(
         "O que minimizar: o tempo de operação (time, soma das horas "
         "ligadas) ou o consumo de energia (energy, soma das potências "
-        "vezes as horas)."
+        "vezes as horas). Pode ser repetida, como em `-o time -o energy`, "
+        "para comparar os dois objetivos em cada carteira."
     ),
 )
 def main(
@@ -97,13 +101,14 @@ def main(
     debug: bool,
     phase_one: bool,
     selected: tuple[int, ...],
-    objective: Objective,
+    objectives: tuple[Objective, ...],
 ) -> None:
     """Resolve as três carteiras de pedidos do artigo.
 
     Com `--portfolio`, resolve só as carteiras escolhidas (numeradas de 1
     a 3, na ordem do artigo). Com `--objective`, escolhe se minimiza o
-    tempo de operação (padrão) ou o consumo de energia. Cada carteira é
+    tempo de operação (padrão), o consumo de energia ou, repetindo a
+    opção, os dois, um depois do outro. Cada carteira é
     resolvida com o menor número de turnos diários que a torna viável;
     para cada uma, mostra as horas, o tempo real (com setup), a energia
     de cada máquina e o custo. As horas de um turno vêm da variável de
@@ -116,16 +121,19 @@ def main(
     console = Console()
     chosen = sorted(set(selected)) or range(1, len(portfolios) + 1)
     results: list[PortfolioResult] = []
+    # Sem repetir objetivos e na ordem de `Objective` (tempo, energia).
+    chosen_objectives = [o for o in Objective if o in objectives]
     for k in chosen:
-        result = solve_portfolio(
-            portfolio=portfolios[k - 1],
-            printers=printers,
-            finishings=finishers,
-            objective=objective,
-        )
-        console.print()
-        console.print(portfolio_report(result=result))
-        results.append(result)
+        for objective in chosen_objectives:
+            result = solve_portfolio(
+                portfolio=portfolios[k - 1],
+                printers=printers,
+                finishings=finishers,
+                objective=objective,
+            )
+            console.print()
+            console.print(portfolio_report(result=result))
+            results.append(result)
     if len(results) > 1:
         console.print()
         console.print(summary_table(results=results))

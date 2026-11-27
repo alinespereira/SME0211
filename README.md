@@ -73,6 +73,7 @@ Não é preciso ativar o ambiente virtual: basta prefixar os comandos com
 ```sh
 uv run printing-company                  # as três carteiras, minimizando o tempo
 uv run printing-company -o energy        # minimizando o consumo de energia
+uv run printing-company -o time -o energy   # os dois objetivos, para comparar
 uv run printing-company -p 1 -p 3        # só as carteiras I e III
 uv run printing-company --debug -p 1     # com o modelo e os tableaux do simplex
 uv run printing-company --debug --phase-one -p 1   # inclui a Fase 1
@@ -89,15 +90,15 @@ o custo. Com mais de
 uma carteira, uma tabela compara todas:
 
 ```text
-                           Resumo · objetivo: tempo
-┏━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┓
-┃ Carteira      ┃ turnos ┃ T (h) ┃    ótimo ┃  τ (h) ┃   E (kWh) ┃        R$ ┃
-┡━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━┩
-│ Portfolio I   │      2 │    20 │  67,75 h │  69,17 │  3.498,43 │  3.008,65 │
-│ Portfolio II  │      3 │    30 │ 162,59 h │ 165,09 │  7.607,13 │  6.542,13 │
-│ Portfolio III │      7 │    70 │ 423,85 h │ 426,85 │ 19.465,85 │ 16.740,63 │
-└───────────────┴────────┴───────┴──────────┴────────┴───────────┴───────────┘
-ótimo: valor do modelo · τ: tempo real · E: energia · R$: custo
+                   Resumo · objetivo: tempo
+┏━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃ Carteira      ┃    ótimo ┃  τ (h) ┃   E (kWh) ┃ custo (R$) ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ Portfolio I   │  67,75 h │  69,17 │  3.498,43 │   3.008,65 │
+│ Portfolio II  │ 162,59 h │ 165,09 │  7.607,13 │   6.542,13 │
+│ Portfolio III │ 423,85 h │ 426,85 │ 19.465,85 │  16.740,63 │
+└───────────────┴──────────┴────────┴───────────┴────────────┘
+ótimo: valor do modelo · τ: tempo real · E: energia
 ```
 
 Com `--debug`, cada iteração mostra o tableau com a variável que entra, a

@@ -220,6 +220,23 @@ def test_main_energy_objective_uses_less_energy() -> None:
     assert energy("energy") < energy("time")
 
 
+@pytest.mark.usefixtures("_restore_root_level")
+def test_main_runs_every_objective() -> None:
+    """Com `-o` repetido, cada carteira é resolvida com cada objetivo, na
+    ordem tempo, energia, e o resumo ganha a coluna `objetivo`."""
+    result = CliRunner().invoke(
+        main, ["-o", "energy", "-o", "time", "-o", "energy"]
+    )
+    assert result.exit_code == 0, result.output
+    assert _titles(result.output) == [
+        (label, objective)
+        for label in ("Portfolio I", "Portfolio II", "Portfolio III")
+        for objective in ("tempo", "energia")
+    ]
+    assert re.search(r"┃ Carteira +┃ objetivo +┃", result.output)
+    assert re.search(r"│ Portfolio III +│ energia +│", result.output)
+
+
 def test_main_rejects_unknown_objective() -> None:
     result = CliRunner().invoke(main, ["--objective", "cost"])
     assert result.exit_code != 0

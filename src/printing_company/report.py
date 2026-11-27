@@ -198,6 +198,12 @@ def _totals_table(*, result: PortfolioResult) -> Table:
 def summary_table(*, results: Sequence[PortfolioResult]) -> Table:
     """Tabela que compara as carteiras resolvidas, uma por linha.
 
+    Se `results` tiver mais de um objetivo, a tabela ganha a coluna
+    `objetivo`, e uma linha separa as carteiras. Os turnos e a capacidade
+    $T$ de cada carteira estão no cabeçalho do relatório dela
+    (`portfolio_report`), e ficam fora daqui para que a tabela caiba em
+    80 colunas.
+
     **Exemplo:**
 
     >>> import io
@@ -214,15 +220,15 @@ def summary_table(*, results: Sequence[PortfolioResult]) -> Table:
     >>> Console(file=out, width=88).print(summary_table(results=results))
     >>> for line in out.getvalue().splitlines():
     ...     print(line.rstrip())
-                               Resumo · objetivo: tempo
-    ┏━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┓
-    ┃ Carteira      ┃ turnos ┃ T (h) ┃    ótimo ┃  τ (h) ┃   E (kWh) ┃        R$ ┃
-    ┡━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━┩
-    │ Portfolio I   │      2 │    20 │  67,75 h │  69,17 │  3.498,43 │  3.008,65 │
-    │ Portfolio II  │      3 │    30 │ 162,59 h │ 165,09 │  7.607,13 │  6.542,13 │
-    │ Portfolio III │      7 │    70 │ 423,85 h │ 426,85 │ 19.465,85 │ 16.740,63 │
-    └───────────────┴────────┴───────┴──────────┴────────┴───────────┴───────────┘
-    ótimo: valor do modelo · τ: tempo real · E: energia · R$: custo
+                       Resumo · objetivo: tempo
+    ┏━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┓
+    ┃ Carteira      ┃    ótimo ┃  τ (h) ┃   E (kWh) ┃ custo (R$) ┃
+    ┡━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━┩
+    │ Portfolio I   │  67,75 h │  69,17 │  3.498,43 │   3.008,65 │
+    │ Portfolio II  │ 162,59 h │ 165,09 │  7.607,13 │   6.542,13 │
+    │ Portfolio III │ 423,85 h │ 426,85 │ 19.465,85 │  16.740,63 │
+    └───────────────┴──────────┴────────┴───────────┴────────────┘
+    ótimo: valor do modelo · τ: tempo real · E: energia
     """
     objectives = {r.objective for r in results}
     title = "Resumo"
@@ -231,21 +237,29 @@ def summary_table(*, results: Sequence[PortfolioResult]) -> Table:
     table = Table(
         title=title,
         header_style="bold",
-        caption="ótimo: valor do modelo · τ: tempo real · E: energia · R$: custo",
+        caption="ótimo: valor do modelo · τ: tempo real · E: energia",
         caption_justify="left",
     )
-    columns = ["Carteira", "turnos", "T (h)", "ótimo", "τ (h)", "E (kWh)", "R$"]
+    many = len(objectives) > 1
+    columns = [
+        "Carteira",
+        *(["objetivo"] if many else []),
+        *("ótimo", "τ (h)", "E (kWh)", "custo (R$)"),
+    ]
     for header in columns:
         table.add_column(
             header,
-            justify="left" if header == "Carteira" else "right",
+            justify="left" if header in {"Carteira", "objetivo"} else "right",
             no_wrap=True,
         )
+    previous: str | None = None
     for r in results:
+        if many and previous is not None and r.portfolio.label != previous:
+            table.add_section()
+        previous = r.portfolio.label
         fixed = [
             r.portfolio.label,
-            str(r.shifts),
-            format_br(value=r.capacity, digits=0),
+            *([r.objective.label] if many else []),
         ]
         if r.status != Status.OPTIMAL or r.objective_value is None:
             table.add_row(*fixed, str(r.status), "", "", "", style="red")
