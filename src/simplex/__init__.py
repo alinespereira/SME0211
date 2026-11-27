@@ -22,6 +22,9 @@ maximização), com o método simplex em duas fases.
   os custos reduzidos e o tableau completo;
 - `simplex.solver`: o `simplex.solver.Solver`, que executa o método a
   partir de uma base viável, com a regra de Bland ou a lexicográfica;
+- `simplex.display`: exibição do tableau, com a variável que entra, a
+  que sai e o pivô em destaque;
+- `simplex.logs`: configuração do `logging` (`simplex.logs.configure_logging`);
 - `simplex.defaults`: tolerância e limite de iterações.
 
 **Exemplo:**
@@ -40,16 +43,17 @@ maximização), com o método simplex em duas fases.
 >>> solution.x.tolist(), solution.objective
 ([4.0, 0.0], 12.0)
 
-**Logs.** Importar o pacote configura o `logging` com o `RichHandler`, no
-nível INFO. O `simplex.solver.Solver` registra cada iteração no nível
-DEBUG.
+**Logs.** Importar o pacote configura o `logging` com o
+`simplex.logs.Handler` (um `RichHandler`), no nível INFO. O
+`simplex.solver.Solver` registra o tableau de cada iteração no nível
+DEBUG, destacando a variável que entra, a que sai e o pivô; use
+`simplex.logs.configure_logging` com `debug=True` para vê-lo.
 """
 
 import logging
 
-from rich.logging import RichHandler
-
-from . import problem, solver, tableau
+from . import display, logs, problem, solver, tableau
+from .logs import Handler, configure_logging
 from .problem import (
     Constraint,
     ConstraintSense,
@@ -69,6 +73,7 @@ from .tableau import Tableau
 __all__ = [
     "Constraint",
     "ConstraintSense",
+    "Handler",
     "ObjectiveSense",
     "PivotingRule",
     "Problem",
@@ -78,6 +83,9 @@ __all__ = [
     "StandardForm",
     "Status",
     "Tableau",
+    "configure_logging",
+    "display",
+    "logs",
     "problem",
     "solver",
     "tableau",
@@ -87,7 +95,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(message)s",
     datefmt="[%X]",
-    handlers=[RichHandler(rich_tracebacks=True, markup=True)],
+    handlers=[Handler(rich_tracebacks=True, markup=True)],
 )
 
 

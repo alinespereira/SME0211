@@ -35,6 +35,8 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from simplex.defaults import MAX_ITERATIONS, TOLERANCE
+from simplex.display import format_number, render_tableau
+from simplex.logs import RICH_TEXT
 from simplex.tableau import FloatArray, Tableau
 
 __all__ = [
@@ -45,6 +47,26 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+def _log_tableau(
+    *,
+    title: str,
+    tableau: Tableau,
+    entering: int | None = None,
+    leaving: int | None = None,
+) -> None:
+    """Registra o tableau no nível DEBUG, com `title` na primeira linha e
+    a variável que entra, a que sai e o pivô em destaque (veja
+    `simplex.display.render_tableau`).
+
+    O tableau só é montado se o nível DEBUG estiver ativo, para não custar
+    nada nas execuções normais.
+    """
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    text = render_tableau(tableau=tableau, entering=entering, leaving=leaving)
+    logger.debug(f"{title}\n{text.plain}", extra={RICH_TEXT: text})
 
 
 class PivotingRule(StrEnum):
@@ -186,6 +208,11 @@ class Solver(BaseModel):
         Repete os passos 1 a 5 até encontrar uma solução ótima, detectar
         que o custo ótimo é $-\infty$ ou atingir `max_iterations`.
 
+        No nível DEBUG do `logging`, registra o tableau de cada iteração,
+        com a coluna da variável que entra marcada com `↓`, a linha da que
+        sai marcada com `→` e o pivô entre colchetes (e em cores no
+        terminal; veja `simplex.display`).
+
         **Parâmetros:**
 
         - `tableau`: tableau associado a uma base viável inicial.
@@ -194,32 +221,49 @@ class Solver(BaseModel):
         de iterações.
         """
         for i in range(self.max_iterations):
-            logger.debug(f"Início:\n{tableau.table = }")
             if self.is_optimal(tableau=tableau):
+                _log_tableau(
+                    title=f"Iteração {i}: solução ótima",
+                    tableau=tableau,
+                )
                 return Result(
                     status=Status.OPTIMAL,
                     tableau=tableau,
                     iterations=i,
                 )
-            else:
-                entering = self.entering_variable(tableau=tableau)
-                u = tableau.column(j=entering)
-                leaving = self.leaving_row(tableau=tableau, u=u)
-                logger.debug(
-                    f"Iteração {i}: entra variável {entering}, sai linha {leaving}"
-                )
-                if leaving is None:
-                    return Result(
-                        status=Status.UNBOUNDED,
-                        tableau=tableau,
-                        iterations=i,
-                    )
-                tableau = self.change_basis(
+            entering = self.entering_variable(tableau=tableau)
+            u = tableau.column(j=entering)
+            leaving = self.leaving_row(tableau=tableau, u=u)
+            names = tableau.variable_names
+            if leaving is None:
+                _log_tableau(
+                    title=(
+                        f"Iteração {i}: entra {names[entering]} (↓), mas "
+                        "u ≤ 0: custo ótimo -∞"
+                    ),
                     tableau=tableau,
-                    j=entering,
-                    ell=leaving,
+                    entering=entering,
                 )
-            logger.debug(f"Final:\n{tableau.table = }")
+                return Result(
+                    status=Status.UNBOUNDED,
+                    tableau=tableau,
+                    iterations=i,
+                )
+            _log_tableau(
+                title=(
+                    f"Iteração {i}: entra {names[entering]} (↓), "
+                    f"sai {names[tableau.basis[leaving]]} (→), "
+                    f"pivô [{format_number(value=float(u[leaving]))}]"
+                ),
+                tableau=tableau,
+                entering=entering,
+                leaving=leaving,
+            )
+            tableau = self.change_basis(
+                tableau=tableau,
+                j=entering,
+                ell=leaving,
+            )
 
         return Result(
             status=Status.ITERATION_LIMIT,

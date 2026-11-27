@@ -192,6 +192,11 @@ class Tableau(BaseModel):
     r"""Índices das variáveis básicas: `basis[i]` é $B(i + 1)$, a variável
     básica da linha $i + 1$ do tableau (e da coluna $i + 1$ de $B$)."""
 
+    names: tuple[str, ...] | None = None
+    """Nome de cada variável (coluna de $A$), usado só para exibir o
+    tableau (veja `simplex.display`). Se `None`, os nomes são `x1`, ...,
+    `xn` (veja `variable_names`)."""
+
     # ------------------------------------------------------------------
     # Validação
     # ------------------------------------------------------------------
@@ -218,6 +223,13 @@ class Tableau(BaseModel):
             raise ValueError("A base não pode ter índices repetidos.")
         if any(not 0 <= j < n for j in self.basis):
             raise ValueError(f"Índices da base devem estar entre 0 e {n - 1}.")
+        if self.names is not None:
+            if len(self.names) != n:
+                raise ValueError(
+                    f"names deve ter {n} nomes, tem {len(self.names)}."
+                )
+            if len(set(self.names)) != n:
+                raise ValueError("names não pode ter nomes repetidos.")
         return self
 
     @model_validator(mode="after")
@@ -244,8 +256,8 @@ class Tableau(BaseModel):
     # ------------------------------------------------------------------
 
     def with_basis(self: Self, *, basis: Sequence[int]) -> "Tableau":
-        r"""Devolve um novo tableau com os mesmos $A$, $b$ e $c$ e a base
-        `basis`.
+        r"""Devolve um novo tableau com os mesmos $A$, $b$, $c$ e `names` e
+        a base `basis`.
 
         O tableau atual não é alterado. O novo tableau é criado pelo
         construtor, então passa por todas as validações: se a nova matriz
@@ -256,7 +268,13 @@ class Tableau(BaseModel):
 
         - `basis`: os índices $\bar{B}(1), \dots, \bar{B}(m)$ da nova base.
         """
-        return Tableau(A=self.A, b=self.b, c=self.c, basis=tuple(basis))
+        return Tableau(
+            A=self.A,
+            b=self.b,
+            c=self.c,
+            basis=tuple(basis),
+            names=self.names,
+        )
 
     # ------------------------------------------------------------------
     # Grandezas derivadas (calculadas a partir de A, b, c e basis)
@@ -271,6 +289,17 @@ class Tableau(BaseModel):
     def num_variables(self: Self) -> int:
         """Número de variáveis, $n$."""
         return int(self.A.shape[1])
+
+    @property
+    def variable_names(self: Self) -> tuple[str, ...]:
+        """`names`, ou `x1`, ..., `xn` se não foram dados.
+
+        >>> Tableau(A=[[1, 1]], b=[1], c=[0, 0], basis=(0,)).variable_names
+        ('x1', 'x2')
+        """
+        if self.names is not None:
+            return self.names
+        return tuple(f"x{j + 1}" for j in range(self.num_variables))
 
     @property
     def non_basis(self: Self) -> tuple[int, ...]:

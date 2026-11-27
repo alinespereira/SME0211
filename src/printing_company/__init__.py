@@ -15,6 +15,15 @@ modelo do artigo, focada no tempo de impressão, resolvida com o pacote
   artigo, em `printing_company.problem.data`;
 - `printing_company.settings`: caminhos do projeto.
 
+**Comando:** `printing-company` (a função `main`) resolve as três
+carteiras do artigo. Com `--debug`, mostra também o tableau de cada
+iteração do simplex, com a variável que entra, a que sai e o pivô em
+destaque (veja `simplex.display`):
+
+```sh
+uv run printing-company --debug
+```
+
 **Exemplo:** a primeira carteira de pedidos do artigo.
 
 >>> from printing_company.problem.data import portfolios, printers
@@ -27,7 +36,7 @@ modelo do artigo, focada no tempo de impressão, resolvida com o pacote
 import logging
 import math
 
-from rich.logging import RichHandler
+import click
 
 from printing_company.problem.analysis import (
     energy_consumption,
@@ -41,14 +50,7 @@ from printing_company.problem.model import (
     min_capacity,
 )
 from printing_company.settings import Settings
-from simplex import PivotingRule, Solver
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(message)s",
-    datefmt="[%X]",
-    handlers=[RichHandler(rich_tracebacks=True, markup=True)],
-)
+from simplex import PivotingRule, Solver, configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +58,25 @@ settings = Settings()
 """Configurações do projeto, carregadas na importação."""
 
 
-def main() -> None:
-    """Ponto de entrada do comando `printing-company`: resolve as três
-    carteiras do artigo, cada uma com o menor número de turnos diários
-    (`SHIFT_HOURS`) que a torna viável (veja `min_capacity`), e mostra o
-    tempo real (com setup), o consumo e o custo de energia (veja
-    `printing_company.problem.analysis`)."""
+@click.command()
+@click.option(
+    "--debug",
+    is_flag=True,
+    help=(
+        "Mostra os logs de DEBUG, com o tableau de cada iteração do "
+        "simplex (variável que entra, que sai e pivô em destaque)."
+    ),
+)
+def main(*, debug: bool) -> None:
+    """Resolve as três carteiras de pedidos do artigo.
+
+    Cada carteira é resolvida com o menor número de turnos diários que a
+    torna viável; para cada uma, mostra o tempo real (com setup), o
+    consumo e o custo de energia.
+    """
+    # A docstring acima é a ajuda do comando (`printing-company --help`).
+    # Veja `SHIFT_HOURS`, `min_capacity` e `printing_company.problem.analysis`.
+    configure_logging(debug=debug)
     for portfolio in portfolios:
         days = math.ceil(
             min_capacity(
