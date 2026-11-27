@@ -6,6 +6,7 @@ de energia.
 
 import logging
 import math
+import time
 from collections.abc import Mapping, Sequence
 from typing import Self
 
@@ -137,6 +138,11 @@ class PortfolioResult(BaseModel):
     machines: tuple[MachineResult, ...] = ()
     """Uma entrada por máquina: as impressoras, depois as de acabamento."""
 
+    solve_seconds: NonNegativeFloat = 0.0
+    """Tempo de execução de `simplex.Problem.solve` (forma padrão, Fase 1
+    e Fase 2), em segundos de relógio (`time.perf_counter`). Com
+    `--debug`, inclui o tempo de montar e registrar os tableaux."""
+
     @property
     def printers(self: Self) -> tuple[MachineResult, ...]:
         """As entradas das máquinas de impressão."""
@@ -209,13 +215,16 @@ def solve_portfolio(
             f"objetivo: {objective.label})\n{text}",
             extra={RICH_TEXT: Text(text)},
         )
+    start = time.perf_counter()
     solution = problem.solve(solver=solver)
+    elapsed = time.perf_counter() - start
     result = PortfolioResult(
         portfolio=portfolio,
         objective=objective,
         shifts=shifts,
         capacity=capacity,
         status=solution.status,
+        solve_seconds=elapsed,
     )
     if solution.status != Status.OPTIMAL or solution.x is None:
         return result

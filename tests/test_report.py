@@ -7,7 +7,12 @@ from rich.console import Console, RenderableType
 
 from printing_company.problem import data
 from printing_company.problem.analysis import solve_portfolio
-from printing_company.report import format_br, portfolio_report, summary_table
+from printing_company.report import (
+    format_br,
+    format_duration,
+    portfolio_report,
+    summary_table,
+)
 
 
 @pytest.mark.parametrize(
@@ -16,6 +21,14 @@ from printing_company.report import format_br, portfolio_report, summary_table
 )
 def test_format_br(value: float, digits: int, text: str) -> None:
     assert format_br(value=value, digits=digits) == text
+
+
+@pytest.mark.parametrize(
+    ("seconds", "text"),
+    [(0.01234, "12,3 ms"), (0.0, "0,0 ms"), (2.5, "2,50 s")],
+)
+def test_format_duration(seconds: float, text: str) -> None:
+    assert format_duration(seconds=seconds) == text
 
 
 def render(renderable: RenderableType) -> list[str]:
@@ -33,6 +46,9 @@ def test_portfolio_report() -> None:
         printers=data.printers,
         finishings=data.finishers,
     )
+    # O tempo de execução varia; fixa um valor para comparar a saída.
+    assert result.solve_seconds > 0
+    result = result.model_copy(update={"solve_seconds": 0.0123})
     assert render(portfolio_report(result=result)) == [
         "──────────────────────────── Portfolio I · objetivo: tempo ─────────────────────────────",
         "10 itens · impressão: 543.000 m · acabamento: 225.000 m (5 itens)",
@@ -53,11 +69,11 @@ def test_portfolio_report() -> None:
         "│ Total    │         │ 67,75 │      │ 69,17 │              │       │ 3.498,43 │",
         "└──────────┴─────────┴───────┴──────┴───────┴──────────────┴───────┴──────────┘",
         "t: horas do modelo · uso: t/T · τ: t + setup · E = kW·τ",
-        "┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓",
-        "┃ Ótimo do modelo ┃ Tempo real (h) ┃ Energia (kWh) ┃ Custo (R$) ┃",
-        "┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩",
-        "│         67,75 h │          69,17 │      3.498,43 │   3.008,65 │",
-        "└─────────────────┴────────────────┴───────────────┴────────────┘",
+        "┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━┓",
+        "┃ Ótimo do modelo ┃ Tempo real (h) ┃ Energia (kWh) ┃ Custo (R$) ┃ Simplex ┃",
+        "┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━┩",
+        "│         67,75 h │          69,17 │      3.498,43 │   3.008,65 │ 12,3 ms │",
+        "└─────────────────┴────────────────┴───────────────┴────────────┴─────────┘",
     ]
 
 
@@ -68,14 +84,18 @@ def test_summary_table() -> None:
         )
         for p in data.portfolios
     ]
+    results = [
+        r.model_copy(update={"solve_seconds": seconds})
+        for r, seconds in zip(results, (0.0123, 0.0045, 1.5), strict=True)
+    ]
     assert render(summary_table(results=results)) == [
-        "                   Resumo · objetivo: tempo",
-        "┏━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┓",
-        "┃ Carteira      ┃    ótimo ┃  τ (h) ┃   E (kWh) ┃ custo (R$) ┃",
-        "┡━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━┩",
-        "│ Portfolio I   │  67,75 h │  69,17 │  3.498,43 │   3.008,65 │",
-        "│ Portfolio II  │ 162,59 h │ 165,09 │  7.607,13 │   6.542,13 │",
-        "│ Portfolio III │ 423,85 h │ 426,85 │ 19.465,85 │  16.740,63 │",
-        "└───────────────┴──────────┴────────┴───────────┴────────────┘",
-        "ótimo: valor do modelo · τ: tempo real · E: energia",
+        "                 Resumo · objetivo: tempo",
+        "┏━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┓",
+        "┃ Carteira      ┃    ótimo ┃  τ (h) ┃   E (kWh) ┃ simplex ┃",
+        "┡━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━┩",
+        "│ Portfolio I   │  67,75 h │  69,17 │  3.498,43 │ 12,3 ms │",
+        "│ Portfolio II  │ 162,59 h │ 165,09 │  7.607,13 │  4,5 ms │",
+        "│ Portfolio III │ 423,85 h │ 426,85 │ 19.465,85 │  1,50 s │",
+        "└───────────────┴──────────┴────────┴───────────┴─────────┘",
+        "τ: tempo real · E: energia · simplex: duração da solução",
     ]

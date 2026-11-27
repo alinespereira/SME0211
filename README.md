@@ -85,20 +85,21 @@ torna viável. Para cada uma, o comando mostra uma tabela com uma linha por
 máquina: a velocidade $v$, as horas de produção $t$ do modelo, o uso da
 capacidade $t/T$, o tempo real $\tau$ (com um setup por máquina ligada),
 os metros produzidos, a potência e a energia $E = kW \cdot \tau$. Abaixo
-dela, outra tabela traz o valor ótimo do modelo, o tempo real, a energia e
-o custo. Com mais de
-uma carteira, uma tabela compara todas:
+dela, outra tabela traz o valor ótimo do modelo, o tempo real, a energia,
+o custo e quanto tempo o simplex levou para resolver o problema (Fases 1 e
+2). Com mais de uma carteira, uma tabela compara todas (o custo fica só
+na tabela de cada carteira, porque é proporcional à energia):
 
 ```text
-                   Resumo · objetivo: tempo
-┏━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┓
-┃ Carteira      ┃    ótimo ┃  τ (h) ┃   E (kWh) ┃ custo (R$) ┃
-┡━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ Portfolio I   │  67,75 h │  69,17 │  3.498,43 │   3.008,65 │
-│ Portfolio II  │ 162,59 h │ 165,09 │  7.607,13 │   6.542,13 │
-│ Portfolio III │ 423,85 h │ 426,85 │ 19.465,85 │  16.740,63 │
-└───────────────┴──────────┴────────┴───────────┴────────────┘
-ótimo: valor do modelo · τ: tempo real · E: energia
+                 Resumo · objetivo: tempo
+┏━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┓
+┃ Carteira      ┃    ótimo ┃  τ (h) ┃   E (kWh) ┃ simplex ┃
+┡━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━┩
+│ Portfolio I   │  67,75 h │  69,17 │  3.498,43 │  4,2 ms │
+│ Portfolio II  │ 162,59 h │ 165,09 │  7.607,13 │  3,9 ms │
+│ Portfolio III │ 423,85 h │ 426,85 │ 19.465,85 │  4,1 ms │
+└───────────────┴──────────┴────────┴───────────┴─────────┘
+τ: tempo real · E: energia · simplex: duração da solução
 ```
 
 Com `--debug`, cada iteração mostra o tableau com a variável que entra, a

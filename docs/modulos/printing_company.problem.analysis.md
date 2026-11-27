@@ -38,7 +38,9 @@ As horas vêm de `Solution.x`, indexadas pelos nomes das variáveis (os
 `solve_portfolio` junta tudo: escolhe o menor número de turnos que torna
 a carteira viável, monta e resolve o modelo e devolve um
 `PortfolioResult`, com as grandezas acima para cada máquina
-(`MachineResult`). É o que o comando `printing-company` mostra (veja
+(`MachineResult`) e a duração da solução pelo simplex
+(`PortfolioResult.solve_seconds`, medida com `time.perf_counter` em volta
+de `simplex.Problem.solve`). É o que o comando `printing-company` mostra (veja
 `printing_company.report`).
 
 O número de turnos é $d = \lceil T_{\min} / h \rceil$, com
