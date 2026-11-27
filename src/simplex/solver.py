@@ -27,6 +27,7 @@ $m$ e o código de $0$ a $m - 1$: a linha $\ell$ das fórmulas é o índice
 `ell - 1` do código.
 """
 
+import logging
 from enum import StrEnum
 from typing import Self
 
@@ -35,6 +36,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from simplex.defaults import TOLERANCE
 from simplex.tableau import FloatArray, Tableau
+
+logger = logging.getLogger(__name__)
 
 
 class PivotingRule(StrEnum):
@@ -138,6 +141,7 @@ class Solver(BaseModel):
         de iterações.
         """
         for i in range(self.max_iterations):
+            logger.debug(f"Início:\n{tableau.table = }")
             if self.is_optimal(tableau=tableau):
                 return Result(
                     status=Status.OPTIMAL,
@@ -148,11 +152,21 @@ class Solver(BaseModel):
                 entering = self.entering_variable(tableau=tableau)
                 u = tableau.column(entering)
                 leaving = self.leaving_row(tableau=tableau, u=u)
+                logger.debug(
+                    f"Iteração {i}: entra variável {entering}, sai linha {leaving}"
+                )
+                if leaving is None:
+                    return Result(
+                        status=Status.UNBOUNDED,
+                        tableau=tableau,
+                        iterations=i,
+                    )
                 tableau = self.change_basis(
                     tableau=tableau,
                     j=entering,
                     ell=leaving,
                 )
+            logger.debug(f"Final:\n{tableau.table = }")
 
         return Result(
             status=Status.ITERATION_LIMIT,
@@ -185,7 +199,7 @@ class Solver(BaseModel):
             case PivotingRule.BLAND:
                 return self._entering_bland(tableau=tableau)
 
-    def leaving_row(self: Self, tableau: Tableau, u: FloatArray) -> int:
+    def leaving_row(self: Self, tableau: Tableau, u: FloatArray) -> int | None:
         r"""Passo 4: escolhe a linha $\ell$ da variável que sai da base.
 
         **Parâmetros:**
@@ -198,6 +212,9 @@ class Solver(BaseModel):
         `_leaving_bland` ou `_leaving_lexicographic`, conforme `rule`; ou
         `None` se $u \leq 0$ (custo ótimo $-\infty$).
         """
+        if np.all(u < -TOLERANCE):
+            return None
+
         match self.rule:
             case PivotingRule.LEXICOGRAPHIC:
                 return self._leaving_lexicographic(tableau=tableau, u=u)
