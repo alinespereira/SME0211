@@ -51,22 +51,23 @@ logger = logging.getLogger(__name__)
 
 def _log_tableau(
     *,
+    log: logging.Logger,
     title: str,
     tableau: Tableau,
     entering: int | None = None,
     leaving: int | None = None,
 ) -> None:
-    """Registra o tableau no nível DEBUG, com `title` na primeira linha e
+    """Registra o tableau no nível DEBUG de `log`, com `title` na primeira linha e
     a variável que entra, a que sai e o pivô em destaque (veja
     `simplex.display.render_tableau`).
 
     O tableau só é montado se o nível DEBUG estiver ativo, para não custar
     nada nas execuções normais.
     """
-    if not logger.isEnabledFor(logging.DEBUG):
+    if not log.isEnabledFor(logging.DEBUG):
         return
     text = render_tableau(tableau=tableau, entering=entering, leaving=leaving)
-    logger.debug(f"{title}\n{text.plain}", extra={RICH_TEXT: text})
+    log.debug(f"{title}\n{text.plain}", extra={RICH_TEXT: text})
 
 
 class PivotingRule(StrEnum):
@@ -202,7 +203,9 @@ class Solver(BaseModel):
     # Laço principal
     # ------------------------------------------------------------------
 
-    def solve(self: Self, *, tableau: Tableau) -> Result:
+    def solve(
+        self: Self, *, tableau: Tableau, log: logging.Logger = logger
+    ) -> Result:
         r"""Executa o método simplex a partir de uma base viável.
 
         Repete os passos 1 a 5 até encontrar uma solução ótima, detectar
@@ -216,6 +219,10 @@ class Solver(BaseModel):
         **Parâmetros:**
 
         - `tableau`: tableau associado a uma base viável inicial.
+        - `log`: o logger em que o tableau é registrado (por padrão, o
+          deste módulo, `simplex.solver`). A Fase 1 usa
+          `simplex.logs.PHASE_ONE_LOGGER`, para que seus tableaux possam
+          ser escondidos à parte.
 
         **Devolve:** um `Result` com o status, o último tableau e o número
         de iterações.
@@ -223,6 +230,7 @@ class Solver(BaseModel):
         for i in range(self.max_iterations):
             if self.is_optimal(tableau=tableau):
                 _log_tableau(
+                    log=log,
                     title=f"Iteração {i}: solução ótima",
                     tableau=tableau,
                 )
@@ -237,6 +245,7 @@ class Solver(BaseModel):
             names = tableau.variable_names
             if leaving is None:
                 _log_tableau(
+                    log=log,
                     title=(
                         f"Iteração {i}: entra {names[entering]} (↓), mas "
                         "u ≤ 0: custo ótimo -∞"
@@ -250,6 +259,7 @@ class Solver(BaseModel):
                     iterations=i,
                 )
             _log_tableau(
+                log=log,
                 title=(
                     f"Iteração {i}: entra {names[entering]} (↓), "
                     f"sai {names[tableau.basis[leaving]]} (→), "

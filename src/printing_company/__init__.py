@@ -18,11 +18,13 @@ modelo do artigo, focada no tempo de impressão, resolvida com o pacote
 **Comando:** `printing-company` (a função `main`) resolve as três
 carteiras do artigo. Com `--debug`, mostra também o tableau de cada
 iteração do simplex, com a variável que entra, a que sai e o pivô em
-destaque (veja `simplex.display`):
+destaque (veja `simplex.display`). Os tableaux da Fase 1 só aparecem com
+`--phase-one`:
 
 ```sh
 uv run printing-company --debug              # as três carteiras
 uv run printing-company --debug --portfolio 2  # só a Portfolio II
+uv run printing-company --debug --phase-one    # inclui a Fase 1
 ```
 
 **Exemplo:** a primeira carteira de pedidos do artigo.
@@ -69,6 +71,11 @@ settings = Settings()
     ),
 )
 @click.option(
+    "--phase-one",
+    is_flag=True,
+    help="Com --debug, mostra também os tableaux da Fase 1.",
+)
+@click.option(
     "-p",
     "--portfolio",
     "selected",
@@ -79,7 +86,7 @@ settings = Settings()
         "ser repetida, como em `-p 1 -p 3`. Sem ela, resolve todas."
     ),
 )
-def main(*, debug: bool, selected: tuple[int, ...]) -> None:
+def main(*, debug: bool, phase_one: bool, selected: tuple[int, ...]) -> None:
     """Resolve as três carteiras de pedidos do artigo.
 
     Com `--portfolio`, resolve só as carteiras escolhidas (numeradas de 1
@@ -89,7 +96,7 @@ def main(*, debug: bool, selected: tuple[int, ...]) -> None:
     """
     # A docstring acima é a ajuda do comando (`printing-company --help`).
     # Veja `SHIFT_HOURS`, `min_capacity` e `printing_company.problem.analysis`.
-    configure_logging(debug=debug)
+    configure_logging(debug=debug, phase_one=phase_one)
     chosen = sorted(set(selected)) or range(1, len(portfolios) + 1)
     for portfolio in (portfolios[k - 1] for k in chosen):
         days = math.ceil(

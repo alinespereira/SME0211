@@ -17,7 +17,12 @@ from rich.console import ConsoleRenderable
 from rich.logging import RichHandler
 from rich.text import Text
 
-__all__ = ["RICH_TEXT", "Handler", "configure_logging"]
+__all__ = ["PHASE_ONE_LOGGER", "RICH_TEXT", "Handler", "configure_logging"]
+
+PHASE_ONE_LOGGER = "simplex.solver.phase_one"
+"""Nome do logger dos tableaux da Fase 1 (veja
+`simplex.problem.StandardForm.initial_tableau`). Como é filho de
+`simplex.solver`, segue o mesmo nível, a menos que se mude o dele."""
 
 RICH_TEXT = "rich_text"
 """Nome do atributo do `logging.LogRecord` com a versão colorida da
@@ -75,15 +80,25 @@ class Handler(RichHandler):
             self.console.print(text, soft_wrap=True, crop=False)
 
 
-def configure_logging(*, debug: bool = False) -> None:
+def configure_logging(*, debug: bool = False, phase_one: bool = False) -> None:
     """Configura o logger raiz: nível DEBUG se `debug`, senão INFO, e um
     `Handler` para o terminal (só se ainda não houver um).
 
     Com `debug`, o `simplex.solver.Solver` mostra o tableau de cada
-    iteração, com a variável que entra, a que sai e o pivô em destaque.
+    iteração da Fase 2, com a variável que entra, a que sai e o pivô em
+    destaque. Os tableaux da Fase 1 (logger `PHASE_ONE_LOGGER`) só
+    aparecem se `phase_one` também for verdadeiro.
+
+    **Parâmetros:**
+
+    - `debug`: mostra os logs de DEBUG.
+    - `phase_one`: com `debug`, mostra também os tableaux da Fase 1.
     """
     root = logging.getLogger()
     root.setLevel(logging.DEBUG if debug else logging.INFO)
+    logging.getLogger(PHASE_ONE_LOGGER).setLevel(
+        logging.NOTSET if phase_one else logging.INFO
+    )
     if not any(isinstance(h, Handler) for h in root.handlers):
         handler = Handler(rich_tracebacks=True, markup=True)
         handler.setFormatter(logging.Formatter("%(message)s", datefmt="[%X]"))

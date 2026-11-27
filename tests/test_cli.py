@@ -11,18 +11,20 @@ import pytest
 from click.testing import CliRunner
 
 from printing_company import main
-from simplex.logs import RICH_TEXT
+from simplex.logs import PHASE_ONE_LOGGER, RICH_TEXT
 from simplex.solver import Solver
 from simplex.tableau import Tableau
 
 
 @pytest.fixture
 def _restore_root_level() -> Iterator[None]:
-    """O comando muda o nível do logger raiz; volta ao nível anterior."""
-    root = logging.getLogger()
-    level = root.level
+    """O comando muda o nível do logger raiz e o da Fase 1; volta aos
+    níveis anteriores."""
+    loggers = [logging.getLogger(), logging.getLogger(PHASE_ONE_LOGGER)]
+    levels = [log.level for log in loggers]
     yield
-    root.setLevel(level)
+    for log, level in zip(loggers, levels, strict=True):
+        log.setLevel(level)
 
 
 @pytest.mark.usefixtures("_restore_root_level")
@@ -62,6 +64,24 @@ def test_main_portfolio_option(
 def test_main_rejects_unknown_portfolio() -> None:
     result = CliRunner().invoke(main, ["--portfolio", "4"])
     assert result.exit_code != 0
+
+
+@pytest.mark.usefixtures("_restore_root_level")
+@pytest.mark.parametrize(
+    ("args", "shows_phase_one"),
+    [(["--debug"], False), (["--debug", "--phase-one"], True)],
+)
+def test_main_phase_one_hidden_unless_asked(
+    caplog: pytest.LogCaptureFixture, args: list[str], shows_phase_one: bool
+) -> None:
+    """Com --debug, só a Fase 2 mostra tableaux; --phase-one inclui a
+    Fase 1."""
+    with caplog.at_level(logging.DEBUG):
+        result = CliRunner().invoke(main, [*args, "-p", "1"])
+    assert result.exit_code == 0, result.output
+    names = {r.name for r in caplog.records if hasattr(r, RICH_TEXT)}
+    assert "simplex.solver" in names
+    assert (PHASE_ONE_LOGGER in names) == shows_phase_one
 
 
 def test_main_help_mentions_debug() -> None:

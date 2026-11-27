@@ -30,6 +30,7 @@ Para resolvê-lo com o simplex, o caminho é:
 `Problem.solve` junta os quatro passos.
 """
 
+import logging
 import tomllib
 from pathlib import Path
 from typing import Literal, Self
@@ -38,6 +39,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from simplex.defaults import TOLERANCE
+from simplex.logs import PHASE_ONE_LOGGER
 from simplex.solver import Result, Solver, Status
 from simplex.tableau import FloatArray, Matrix, Tableau, Vector
 
@@ -432,7 +434,8 @@ class StandardForm(BaseModel):
     def initial_tableau(self: Self, *, solver: Solver) -> Tableau | None:
         r"""Fase 1: encontra uma base viável para a forma padrão.
 
-        1. Resolva o problema auxiliar (`phase_one_tableau`) com `solver`.
+        1. Resolva o problema auxiliar (`phase_one_tableau`) com `solver`
+           (os tableaux vão para o logger `simplex.logs.PHASE_ONE_LOGGER`).
         2. Se o custo ótimo for positivo (maior que `TOLERANCE`), o
            problema original é inviável: devolva `None`.
         3. Senão, todas as artificiais valem zero. Se alguma artificial
@@ -451,7 +454,10 @@ class StandardForm(BaseModel):
         num_constraints, num_variables = self.A.shape
 
         # 1. Resolve o problema auxiliar.
-        tableau = solver.solve(tableau=self.phase_one_tableau()).tableau
+        tableau = solver.solve(
+            tableau=self.phase_one_tableau(),
+            log=logging.getLogger(PHASE_ONE_LOGGER),
+        ).tableau
 
         # 2. Custo ótimo positivo: alguma artificial não pode ser zerada.
         if tableau.objective_value > TOLERANCE:
