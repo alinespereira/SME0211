@@ -1,4 +1,20 @@
+r"""Instâncias do artigo *Energy consumption optimization in a printing
+company* (Gestão & Produção, 2024).
+
+As máquinas vêm da Tabela 1 (velocidade em m/h, setup em h e consumo em
+kWh) e as carteiras de pedidos, das Tabelas 2 a 4 (demandas em metros). Os
+itens que exigem acabamento são D01 a D05 na carteira I, D01 a D10 na II e
+D01 a D35 na III.
+
+>>> len(printers), len(finishers), [len(p.demands) for p in portfolios]
+(5, 3, [10, 20, 50])
+>>> portfolios[1].with_finishing, portfolios[1].without_finishing
+(543000.0, 620000.0)
+"""
+
 from .spec import Demand, FinishingMachine, Portfolio, PrintingMachine
+
+__all__ = ["finishers", "portfolios", "printers"]
 
 printers = [
     PrintingMachine(id="Print01", speed=10_500, setup=0.25, consumption=40),
@@ -7,25 +23,29 @@ printers = [
     PrintingMachine(id="Print04", speed=12_600, setup=0.17, consumption=24),
     PrintingMachine(id="Print05", speed=9_000, setup=0.25, consumption=2.2),
 ]
+"""Máquinas de impressão $m \\in M$ (Tabela 1 do artigo)."""
+
 finishers = [
     FinishingMachine(id="Finish01", speed=7_800, setup=0.5, consumption=40),
     FinishingMachine(id="Finish03", speed=10_800, setup=0.75, consumption=50),
     FinishingMachine(id="Finish02", speed=12_000, setup=0.75, consumption=112),
 ]
+"""Máquinas de acabamento $n \\in N$ (Tabela 1 do artigo)."""
+
 portfolios = [
     Portfolio(
         label="Portfolio I",
         demands=[
-            Demand(label="D01", quantity=15.000, requires_finishing=True),
-            Demand(label="D02", quantity=20.000, requires_finishing=True),
-            Demand(label="D03", quantity=55.000, requires_finishing=True),
-            Demand(label="D04", quantity=85.000, requires_finishing=True),
-            Demand(label="D05", quantity=50.000, requires_finishing=True),
-            Demand(label="D06", quantity=60.000, requires_finishing=False),
-            Demand(label="D07", quantity=70.000, requires_finishing=False),
-            Demand(label="D08", quantity=80.000, requires_finishing=False),
-            Demand(label="D09", quantity=90.000, requires_finishing=False),
-            Demand(label="D10", quantity=18.000, requires_finishing=False),
+            Demand(label="D01", quantity=15_000, requires_finishing=True),
+            Demand(label="D02", quantity=20_000, requires_finishing=True),
+            Demand(label="D03", quantity=55_000, requires_finishing=True),
+            Demand(label="D04", quantity=85_000, requires_finishing=True),
+            Demand(label="D05", quantity=50_000, requires_finishing=True),
+            Demand(label="D06", quantity=60_000, requires_finishing=False),
+            Demand(label="D07", quantity=70_000, requires_finishing=False),
+            Demand(label="D08", quantity=80_000, requires_finishing=False),
+            Demand(label="D09", quantity=90_000, requires_finishing=False),
+            Demand(label="D10", quantity=18_000, requires_finishing=False),
         ],
     ),
     Portfolio(
@@ -109,3 +129,4 @@ portfolios = [
         ],
     ),
 ]
+"""Carteiras de pedidos I, II e III (Tabelas 2 a 4 do artigo)."""

@@ -5,14 +5,16 @@ in a printing company* (Gestão & Produção, 2024), na versão relaxada do
 trabalho, focada no tempo de impressão:
 
 - as **máquinas de impressão** $m \in M$ e as **máquinas de acabamento**
-  $n \in N$, cada uma com velocidade $v$ (em metros por minuto), tempo
-  médio de setup $A$ (em minutos) e consumo de energia $kw$ (em kWh);
+  $n \in N$, cada uma com velocidade $v$ (em metros por hora), tempo
+  médio de setup $A$ (em horas) e consumo de energia $kw$ (em kWh), nas
+  unidades da Tabela 1 do artigo;
 - a **carteira de pedidos**: os itens $i \in I$, cada um com demanda $D_i$
   (em metros), e o subconjunto $F \subseteq I$ dos itens que, depois de
   impressos, também passam por uma máquina de acabamento.
 
 Com esses dados, o tempo para produzir $z$ metros de um item na máquina
-$m$ é $T_m z + A_m$, em que $T_m = 1 / v_m$ é o tempo por metro.
+$m$ é $T_m z + A_m$ horas, em que $T_m = 1 / v_m$ é o tempo por metro.
+Os dados do artigo estão em `printing_company.problem.data`.
 
 Todos os modelos são imutáveis (`frozen`).
 """
@@ -21,6 +23,14 @@ from abc import ABC
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, PositiveFloat, computed_field
+
+__all__ = [
+    "Demand",
+    "FinishingMachine",
+    "Machine",
+    "Portfolio",
+    "PrintingMachine",
+]
 
 
 class Machine(BaseModel, ABC):
@@ -53,11 +63,11 @@ class Machine(BaseModel, ABC):
     """Identificador da máquina (por exemplo, `"P1"`)."""
 
     speed: PositiveFloat
-    r"""Velocidade de operação $v$, em metros por minuto. O tempo por metro
-    é $T = 1 / v$."""
+    r"""Velocidade de operação $v$, em metros por hora. O tempo por metro
+    é $T = 1 / v$, em horas."""
 
     setup: PositiveFloat
-    r"""Tempo médio de setup $A$, em minutos: o tempo gasto para preparar a
+    r"""Tempo médio de setup $A$, em horas: o tempo gasto para preparar a
     máquina antes de produzir um item."""
 
     consumption: PositiveFloat
@@ -77,14 +87,14 @@ class Machine(BaseModel, ABC):
 class PrintingMachine(Machine):
     r"""Máquina de impressão $m \in M$. Todo item passa por uma delas.
 
-    **Exemplo:** uma impressora que imprime 200 m/min, com setup médio de
-    30 minutos e consumo de 50 kWh.
+    **Exemplo:** a `Print01` do artigo, que imprime 10 500 m/h, com setup
+    médio de 0,25 h e consumo de 40 kWh.
 
-    >>> p = PrintingMachine(id="P1", speed=200, setup=30, consumption=50)
+    >>> p = PrintingMachine(id="Print01", speed=10_500, setup=0.25, consumption=40)
     >>> p
-    PrintingMachine(id='P1', speed=200.0, setup=30.0, consumption=50.0)
-    >>> 1 / p.speed  # tempo por metro, em minutos
-    0.005
+    PrintingMachine(id='Print01', speed=10500.0, setup=0.25, consumption=40.0)
+    >>> round(p.setup + 15_000 / p.speed, 4)  # horas para 15 000 m, com setup
+    1.6786
     >>> p.speed = 300  # doctest: +ELLIPSIS
     Traceback (most recent call last):
         ...
@@ -104,9 +114,9 @@ class FinishingMachine(Machine):
 
     **Exemplo:**
 
-    >>> f = FinishingMachine(id="A1", speed=100, setup=15, consumption=20)
+    >>> f = FinishingMachine(id="Finish01", speed=7_800, setup=0.5, consumption=40)
     >>> f.setup
-    15.0
+    0.5
     >>> isinstance(f, Machine)
     True
     """
@@ -166,7 +176,7 @@ class Portfolio(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     label: str
-    """Nome do item (por exemplo, o tipo de formulário)."""
+    """Nome da carteira (por exemplo, `"Portfolio I"`)."""
 
     demands: list[Demand]
     """Demandas dos itens, na ordem em que foram pedidos."""

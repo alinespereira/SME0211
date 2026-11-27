@@ -1,0 +1,37 @@
+{#
+Árvore de módulos para a barra lateral e para a página inicial.
+
+Cada pacote vira um <details>: clicar na seta abre ou fecha a lista de
+submódulos, e clicar no nome abre a página do pacote. Não usa JavaScript.
+O pacote da página atual (e os pacotes acima dele) já vêm abertos.
+
+- names: nomes de todos os módulos documentados (all_modules).
+- current: nome do módulo da página atual ("" na página inicial).
+#}
+{% macro module_tree(names, current, parent="") -%}
+    {%- set prefix = "../" * current.count(".") -%}
+    <ul class="module-tree">
+        {%- for name in names | sort -%}
+            {%- set rest = name[parent | length + 1:] if parent else name -%}
+            {%- if (not parent or name.startswith(parent ~ ".")) and "." not in rest
+                  and not rest.startswith("_") -%}
+                {%- set ns = namespace(has_children=false) -%}
+                {%- for other in names if other.startswith(name ~ ".") -%}
+                    {%- set ns.has_children = true -%}
+                {%- endfor -%}
+                {%- set href = prefix ~ name.replace(".", "/") ~ ".html" -%}
+                {%- set is_current = name == current -%}
+                <li>
+                    {%- if ns.has_children -%}
+                        <details{% if is_current or current.startswith(name ~ ".") %} open{% endif %}>
+                            <summary><a href="{{ href }}"{% if is_current %} class="current" aria-current="page"{% endif %}>{{ rest }}</a></summary>
+                            {{ module_tree(names, current, name) }}
+                        </details>
+                    {%- else -%}
+                        <a href="{{ href }}"{% if is_current %} class="current" aria-current="page"{% endif %}>{{ rest }}</a>
+                    {%- endif -%}
+                </li>
+            {%- endif -%}
+        {%- endfor -%}
+    </ul>
+{%- endmacro %}

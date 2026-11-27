@@ -3,9 +3,17 @@ Template do pdoc para este projeto.
 
 Campos obrigatórios de modelos pydantic não têm valor padrão, e o pdoc
 mostraria "= PydanticUndefined" ao lado deles. Aqui escondemos esse valor.
+
+Na barra lateral, a lista de submódulos dá lugar à árvore de todos os
+módulos (veja module_tree.html.jinja2), com o pacote atual aberto.
 Uso: pdoc --math -t pdoc-templates simplex printing_company
 #}
 {% extends "default/module.html.jinja2" %}
+{% from "module_tree.html.jinja2" import module_tree %}
+{% block nav_submodules %}
+    <h2>Módulos</h2>
+    {{ module_tree(all_modules.keys() | list, module.modulename) }}
+{% endblock %}
 {% macro default_value(var) -%}
     {%- if var.default_value_str != "PydanticUndefined" -%}
         {{ default_default_value(var) }}
