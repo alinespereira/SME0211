@@ -34,7 +34,7 @@ from typing import Self
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
-from simplex.defaults import TOLERANCE
+from simplex.defaults import MAX_ITERATIONS, TOLERANCE
 from simplex.tableau import FloatArray, Tableau
 
 logger = logging.getLogger(__name__)
