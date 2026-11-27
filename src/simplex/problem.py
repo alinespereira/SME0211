@@ -33,6 +33,7 @@ Para resolvê-lo com o simplex, o caminho é:
 from pathlib import Path
 from typing import Literal, Self
 
+import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from simplex.defaults import TOLERANCE
@@ -44,6 +45,13 @@ type ConstraintSense = Literal["<=", ">=", "=="]
 
 type ObjectiveSense = Literal["min", "max"]
 """Sentido da otimização."""
+
+_FLIPPED_SENSE: dict[ConstraintSense, ConstraintSense] = {
+    "<=": ">=",
+    ">=": "<=",
+    "==": "==",
+}
+"""Sentido da restrição depois de multiplicá-la por $-1$."""
 
 
 class Constraint(BaseModel):
@@ -163,7 +171,50 @@ class Problem(BaseModel):
         com custo zero. Os nomes das novas variáveis são `s{i}` e `e{i}`,
         com `i` começando em 1.
         """
-        raise NotImplementedError
+        m = self.num_constraints
+        sign: Literal[1, -1] = -1 if self.sense == "max" else 1
+
+        rows: list[FloatArray] = []
+        rhs: list[float] = []
+        extra_columns: list[FloatArray] = []
+        names = list(self.variable_names)
+
+        for i, constraint in enumerate(self.constraints):
+            coefs, b_i, sense = (
+                constraint.coefs,
+                constraint.rhs,
+                constraint.sense,
+            )
+
+            # Passo 2: lado direito negativo -> multiplica a linha por -1.
+            if b_i < 0:
+                coefs, b_i = -coefs, -b_i
+                sense = _FLIPPED_SENSE[sense]
+            rows.append(coefs)
+            rhs.append(b_i)
+
+            # Passo 3: folga (+1) para <=, excesso (-1) para >=.
+            if sense != "==":
+                column = np.zeros(m)
+                column[i] = 1.0 if sense == "<=" else -1.0
+                extra_columns.append(column)
+                names.append(f"{'s' if sense == '<=' else 'e'}{i + 1}")
+
+        matrix = np.vstack(rows)
+        if extra_columns:
+            matrix = np.hstack([matrix, np.column_stack(extra_columns)])
+
+        # Passo 1: max c^T x = -min (-c)^T x; folgas e excessos custam 0.
+        c = np.concatenate([sign * self.c, np.zeros(len(extra_columns))])
+
+        return StandardForm(
+            A=matrix,
+            b=np.array(rhs),
+            c=c,
+            names=tuple(names),
+            num_original=self.num_variables,
+            objective_sign=sign,
+        )
 
     def solve(self: Self, solver: Solver | None = None) -> "Solution":
         """Resolve o problema: forma padrão, Fase 1, Fase 2 e volta às
