@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from printing_company.settings import ENV_FILE, ROOT_DIR, Settings
+from printing_company.settings import Settings
 
 
 @pytest.fixture(autouse=True)
@@ -45,10 +45,13 @@ def test_environment_wins_over_env_file(
 
 def test_env_example_has_paper_values() -> None:
     """O `.env.example` versionado tem os valores padrão do artigo."""
-    example = Settings(_env_file=ROOT_DIR / ".env.example")
+    root = Settings(_env_file=None).root_dir
+    example = Settings(_env_file=root / ".env.example")
     assert example.shift_hours == Settings(_env_file=None).shift_hours
     assert example.energy_price == Settings(_env_file=None).energy_price
 
 
 def test_env_file_is_at_project_root() -> None:
-    assert ENV_FILE == ROOT_DIR / ".env"
+    root = Settings(_env_file=None).root_dir
+    assert (root / "src" / "printing_company").is_dir()
+    assert Settings.model_config.get("env_file") == root / ".env"
