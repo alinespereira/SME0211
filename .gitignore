@@ -11,3 +11,5 @@ docs/api/
 log/*
 
 *.diff
+
+.env

@@ -6,7 +6,8 @@ trabalho, focada no tempo de impressão:
 
 - as **máquinas de impressão** $m \in M$ e as **máquinas de acabamento**
   $n \in N$, cada uma com velocidade $v$ (em metros por hora), tempo
-  médio de setup $A$ (em horas) e consumo de energia $kw$ (em kWh), nas
+  médio de setup $A$ (em horas) e consumo de energia $kw$ (em kWh por
+  hora de operação, isto é, a potência em kW), nas
   unidades da Tabela 1 do artigo;
 - a **carteira de pedidos**: os itens $i \in I$, cada um com demanda $D_i$
   (em metros), e o subconjunto $F \subseteq I$ dos itens que, depois de
@@ -72,7 +73,8 @@ class Machine(BaseModel, ABC):
     máquina antes de produzir um item."""
 
     consumption: PositiveFloat
-    r"""Consumo de energia $kw$ da máquina, em kWh."""
+    r"""Consumo de energia $kw$ da máquina, em kWh por hora de operação
+    (a potência, em kW; veja `printing_company.problem.analysis`)."""
 
     def __init__(self, **data: Any) -> None:  # noqa: ANN401
         """Cria a máquina, recusando instâncias da própria `Machine`.
