@@ -128,7 +128,7 @@ class Problem(BaseModel):
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_toml(cls: type[Self], path: Path | str) -> Self:
+    def from_toml(cls: type[Self], *, path: Path | str) -> Self:
         """Lê um problema de um arquivo TOML.
 
         O arquivo tem as mesmas chaves que os campos da classe; cada
@@ -219,7 +219,7 @@ class Problem(BaseModel):
             objective_sign=sign,
         )
 
-    def solve(self: Self, solver: Solver | None = None) -> "Solution":
+    def solve(self: Self, *, solver: Solver | None = None) -> "Solution":
         """Resolve o problema: forma padrão, Fase 1, Fase 2 e volta às
         variáveis originais.
 
@@ -235,17 +235,17 @@ class Problem(BaseModel):
         standard = self.to_standard_form()
 
         # Fase 1: base viável inicial (ou prova de inviabilidade).
-        tableau = standard.initial_tableau(solver)
+        tableau = standard.initial_tableau(solver=solver)
         if tableau is None:
             return Solution(status=Status.INFEASIBLE)
 
         # Fase 2: o simplex a partir dessa base.
-        result = solver.solve(tableau)
+        result = solver.solve(tableau=tableau)
         final = result.tableau
         return Solution(
             status=result.status,
-            x=standard.original_solution(final.solution),
-            objective=standard.original_objective(final.objective_value),
+            x=standard.original_solution(x=final.solution),
+            objective=standard.original_objective(value=final.objective_value),
             result=result,
         )
 
@@ -328,7 +328,7 @@ class StandardForm(BaseModel):
         basis = tuple(range(num_variables, num_variables + num_constraints))
         return Tableau(A=A, b=b, c=c, basis=basis)
 
-    def initial_tableau(self: Self, solver: Solver) -> Tableau | None:
+    def initial_tableau(self: Self, *, solver: Solver) -> Tableau | None:
         r"""Fase 1: encontra uma base viável para a forma padrão.
 
         1. Resolva o problema auxiliar (`phase_one_tableau`) com `solver`.
@@ -350,7 +350,7 @@ class StandardForm(BaseModel):
         num_constraints, num_variables = self.A.shape
 
         # 1. Resolve o problema auxiliar.
-        tableau = solver.solve(self.phase_one_tableau()).tableau
+        tableau = solver.solve(tableau=self.phase_one_tableau()).tableau
 
         # 2. Custo ótimo positivo: alguma artificial não pode ser zerada.
         if tableau.objective_value > TOLERANCE:
@@ -371,7 +371,7 @@ class StandardForm(BaseModel):
             ]
             if candidates:
                 basis[ell] = candidates[0]
-                tableau = tableau.with_basis(basis)
+                tableau = tableau.with_basis(basis=basis)
             else:
                 redundant.append(ell)
 
@@ -388,12 +388,12 @@ class StandardForm(BaseModel):
     # Volta ao problema original
     # ------------------------------------------------------------------
 
-    def original_solution(self: Self, x: FloatArray) -> FloatArray:
+    def original_solution(self: Self, *, x: FloatArray) -> FloatArray:
         r"""Restringe uma solução $\tilde{x}$ da forma padrão às $n$
         variáveis originais (descarta folgas e excessos)."""
         return x[: self.num_original]
 
-    def original_objective(self: Self, value: float) -> float:
+    def original_objective(self: Self, *, value: float) -> float:
         r"""Converte o valor $\tilde{c}^\top \tilde{x}$ no valor da função
         objetivo original, multiplicando por `objective_sign`."""
         return self.objective_sign * value

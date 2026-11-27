@@ -21,7 +21,7 @@ settings = Settings()
     metavar="NUTRIENTE",
     help="Nutriente a retirar das restrições (ex.: calcio). Pode repetir.",
 )
-def main(data_dir: Path, skip: tuple[str, ...]) -> None:
+def main(*, data_dir: Path, skip: tuple[str, ...]) -> None:
     raise NotImplementedError
 
 

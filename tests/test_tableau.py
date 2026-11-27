@@ -88,7 +88,7 @@ def test_copies_input_arrays() -> None:
 
 
 def test_with_basis_returns_new_tableau(small: Tableau) -> None:
-    new = small.with_basis([0, 1])
+    new = small.with_basis(basis=[0, 1])
     assert new.basis == (0, 1)
     assert small.basis == (2, 3)
     np.testing.assert_array_equal(new.A, small.A)
@@ -96,7 +96,7 @@ def test_with_basis_returns_new_tableau(small: Tableau) -> None:
 
 def test_with_basis_validates(small: Tableau) -> None:
     with pytest.raises(ValidationError, match="não é viável"):
-        small.with_basis((0, 2))
+        small.with_basis(basis=(0, 2))
 
 
 # ----------------------------------------------------------------------
@@ -120,7 +120,7 @@ def test_slack_basis(small: Tableau) -> None:
 
 
 def test_optimal_basis(small: Tableau) -> None:
-    t = small.with_basis((0, 1))
+    t = small.with_basis(basis=(0, 1))
     np.testing.assert_allclose(t.B, [[1, 1], [1, 3]])
     np.testing.assert_allclose(t.basic_solution, [3, 1])
     np.testing.assert_allclose(t.multipliers, [-0.5, -0.5])
@@ -130,8 +130,8 @@ def test_optimal_basis(small: Tableau) -> None:
 
 
 def test_basis_order_matters_only_for_rows(small: Tableau) -> None:
-    t01 = small.with_basis((0, 1))
-    t10 = small.with_basis((1, 0))
+    t01 = small.with_basis(basis=(0, 1))
+    t10 = small.with_basis(basis=(1, 0))
     np.testing.assert_allclose(t10.basic_solution, [1, 3])
     np.testing.assert_allclose(t10.solution, t01.solution)
     np.testing.assert_allclose(t10.reduced_costs, t01.reduced_costs)
@@ -139,7 +139,7 @@ def test_basis_order_matters_only_for_rows(small: Tableau) -> None:
 
 def test_reduced_costs_of_basic_variables_are_zero(small: Tableau) -> None:
     for basis in [(2, 3), (0, 1), (0, 3), (1, 2)]:
-        t = small.with_basis(basis)
+        t = small.with_basis(basis=basis)
         np.testing.assert_allclose(t.reduced_costs[list(basis)], 0, atol=1e-12)
 
 
@@ -159,7 +159,7 @@ def test_column_matches_aula18() -> None:
         c=np.zeros(4),
         basis=(0, 1, 2),
     )
-    np.testing.assert_allclose(t.column(3), [-4, 2, 2])
+    np.testing.assert_allclose(t.column(j=3), [-4, 2, 2])
 
 
 def test_table(small: Tableau) -> None:
@@ -172,7 +172,7 @@ def test_table(small: Tableau) -> None:
         ],
     )
     np.testing.assert_allclose(
-        small.with_basis((0, 1)).table,
+        small.with_basis(basis=(0, 1)).table,
         [
             [5, 0, 0, 0.5, 0.5],
             [3, 1, 0, 1.5, -0.5],

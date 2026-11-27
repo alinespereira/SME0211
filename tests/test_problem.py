@@ -104,7 +104,7 @@ def test_standard_form_requires_nonnegative_b() -> None:
 
 
 def test_from_toml(pequeno: Problem) -> None:
-    p = Problem.from_toml(EXAMPLES / "pequeno.toml")
+    p = Problem.from_toml(path=EXAMPLES / "pequeno.toml")
     assert p.sense == "max"
     np.testing.assert_array_equal(p.c, pequeno.c)
     assert p.names == pequeno.names
@@ -113,7 +113,7 @@ def test_from_toml(pequeno: Problem) -> None:
 
 
 def test_from_toml_accepts_str_path() -> None:
-    p = Problem.from_toml(str(EXAMPLES / "pequeno.toml"))
+    p = Problem.from_toml(path=str(EXAMPLES / "pequeno.toml"))
     assert p.num_constraints == 3
 
 
@@ -160,9 +160,9 @@ def test_standard_form_negative_rhs() -> None:
 def test_original_solution_and_objective(pequeno: Problem) -> None:
     sf = pequeno.to_standard_form()
     np.testing.assert_allclose(
-        sf.original_solution(np.array([4, 0, 0, 2, 3])), [4, 0]
+        sf.original_solution(x=np.array([4, 0, 0, 2, 3])), [4, 0]
     )
-    assert sf.original_objective(-12) == pytest.approx(12)
+    assert sf.original_objective(value=-12) == pytest.approx(12)
 
 
 # ----------------------------------------------------------------------
@@ -181,7 +181,7 @@ def test_phase_one_tableau(pequeno: Problem) -> None:
 
 def test_initial_tableau_is_feasible(solver: Solver, pequeno: Problem) -> None:
     sf = pequeno.to_standard_form()
-    t = sf.initial_tableau(solver)
+    t = sf.initial_tableau(solver=solver)
     assert t is not None
     np.testing.assert_allclose(t.A, sf.A)
     np.testing.assert_allclose(t.c, sf.c)
@@ -194,7 +194,7 @@ def test_initial_tableau_infeasible(solver: Solver) -> None:
     sf = make(
         "min", [1, 1], ([1, 1], "<=", 1), ([1, 1], ">=", 2)
     ).to_standard_form()
-    assert sf.initial_tableau(solver) is None
+    assert sf.initial_tableau(solver=solver) is None
 
 
 def test_initial_tableau_removes_redundant_row(solver: Solver) -> None:
@@ -202,7 +202,7 @@ def test_initial_tableau_removes_redundant_row(solver: Solver) -> None:
     sf = make(
         "min", [1, 0], ([1, 1], "==", 2), ([2, 2], "==", 4)
     ).to_standard_form()
-    t = sf.initial_tableau(solver)
+    t = sf.initial_tableau(solver=solver)
     assert t is not None
     assert t.num_constraints == 1
     assert t.basis[0] in (0, 1)
@@ -214,7 +214,7 @@ def test_initial_tableau_removes_redundant_row(solver: Solver) -> None:
 
 
 def test_solve_pequeno(solver: Solver, pequeno: Problem) -> None:
-    s = pequeno.solve(solver)
+    s = pequeno.solve(solver=solver)
     assert s.status == Status.OPTIMAL
     assert s.objective == pytest.approx(12)
     assert s.x is not None
@@ -229,14 +229,14 @@ def test_solve_default_solver(pequeno: Problem) -> None:
 
 
 def test_solve_from_toml(solver: Solver) -> None:
-    s = Problem.from_toml(EXAMPLES / "pequeno.toml").solve(solver)
+    s = Problem.from_toml(path=EXAMPLES / "pequeno.toml").solve(solver=solver)
     assert s.objective == pytest.approx(12)
 
 
 def test_solve_greater_equal(solver: Solver) -> None:
     """Só restrições >=: a origem não é viável e a Fase 1 é necessária."""
     p = make("min", [1, 1], ([1, 2], ">=", 4), ([3, 1], ">=", 6))
-    s = p.solve(solver)
+    s = p.solve(solver=solver)
     assert s.status == Status.OPTIMAL
     assert s.objective == pytest.approx(14 / 5)
     assert s.x is not None
@@ -245,7 +245,7 @@ def test_solve_greater_equal(solver: Solver) -> None:
 
 def test_solve_equality(solver: Solver) -> None:
     p = make("min", [2, 3], ([1, 1], "==", 5), ([1, 0], "<=", 3))
-    s = p.solve(solver)
+    s = p.solve(solver=solver)
     assert s.objective == pytest.approx(12)
     assert s.x is not None
     np.testing.assert_allclose(s.x, [3, 2], atol=1e-9)
@@ -253,13 +253,13 @@ def test_solve_equality(solver: Solver) -> None:
 
 def test_solve_negative_rhs(solver: Solver) -> None:
     p = make("min", [1, 2], ([-1, -1], "<=", -2))
-    s = p.solve(solver)
+    s = p.solve(solver=solver)
     assert s.objective == pytest.approx(2)
 
 
 def test_solve_infeasible(solver: Solver) -> None:
     p = make("min", [1, 1], ([1, 1], "<=", 1), ([1, 1], ">=", 2))
-    s = p.solve(solver)
+    s = p.solve(solver=solver)
     assert s.status == Status.INFEASIBLE
     assert s.x is None
     assert s.objective is None
@@ -267,11 +267,11 @@ def test_solve_infeasible(solver: Solver) -> None:
 
 def test_solve_unbounded(solver: Solver) -> None:
     p = make("max", [1, 0], ([1, -1], "<=", 1))
-    assert p.solve(solver).status == Status.UNBOUNDED
+    assert p.solve(solver=solver).status == Status.UNBOUNDED
 
 
 def test_solve_redundant(solver: Solver) -> None:
     p = make("min", [1, 0], ([1, 1], "==", 2), ([2, 2], "==", 4))
-    s = p.solve(solver)
+    s = p.solve(solver=solver)
     assert s.status == Status.OPTIMAL
     assert s.objective == pytest.approx(0)

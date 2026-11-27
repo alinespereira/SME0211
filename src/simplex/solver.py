@@ -113,7 +113,7 @@ class Solver(BaseModel):
     Exemplo de uso:
 
         solver = Solver(rule=PivotingRule.BLAND)
-        result = solver.solve(tableau)
+        result = solver.solve(tableau=tableau)
 
     Os métodos públicos correspondem aos passos do método descritos no
     módulo; os métodos `_entering_*` e `_leaving_*` implementam a parte de
@@ -125,14 +125,14 @@ class Solver(BaseModel):
     rule: PivotingRule = PivotingRule.BLAND
     """Regra anticiclagem usada nos passos 2 e 4."""
 
-    max_iterations: int = Field(default=1000, gt=0)
+    max_iterations: int = Field(default=MAX_ITERATIONS, gt=0)
     """Número máximo de trocas de base antes de desistir."""
 
     # ------------------------------------------------------------------
     # Laço principal
     # ------------------------------------------------------------------
 
-    def solve(self: Self, tableau: Tableau) -> Result:
+    def solve(self: Self, *, tableau: Tableau) -> Result:
         r"""Executa o método simplex a partir de uma base viável.
 
         Repete os passos 1 a 5 até encontrar uma solução ótima, detectar
@@ -155,7 +155,7 @@ class Solver(BaseModel):
                 )
             else:
                 entering = self.entering_variable(tableau=tableau)
-                u = tableau.column(entering)
+                u = tableau.column(j=entering)
                 leaving = self.leaving_row(tableau=tableau, u=u)
                 logger.debug(
                     f"Iteração {i}: entra variável {entering}, sai linha {leaving}"
@@ -183,7 +183,7 @@ class Solver(BaseModel):
     # Passos de uma iteração
     # ------------------------------------------------------------------
 
-    def is_optimal(self: Self, tableau: Tableau) -> bool:
+    def is_optimal(self: Self, *, tableau: Tableau) -> bool:
         r"""Passo 1: testa se $\bar{c}_j \geq 0$ para todo $j$.
 
         Use a tolerância `simplex.tableau.TOLERANCE`: considere
@@ -191,7 +191,7 @@ class Solver(BaseModel):
         """
         return bool(np.all(tableau.reduced_costs >= -TOLERANCE))
 
-    def entering_variable(self: Self, tableau: Tableau) -> int:
+    def entering_variable(self: Self, *, tableau: Tableau) -> int:
         r"""Passo 2: escolhe o índice $j$ da variável que entra na base.
 
         Deve ser chamado só quando a solução atual não é ótima, isto é,
@@ -204,7 +204,9 @@ class Solver(BaseModel):
             case PivotingRule.BLAND:
                 return self._entering_bland(tableau=tableau)
 
-    def leaving_row(self: Self, tableau: Tableau, u: FloatArray) -> int | None:
+    def leaving_row(
+        self: Self, *, tableau: Tableau, u: FloatArray
+    ) -> int | None:
         r"""Passo 4: escolhe a linha $\ell$ da variável que sai da base.
 
         **Parâmetros:**
@@ -226,7 +228,9 @@ class Solver(BaseModel):
             case PivotingRule.BLAND:
                 return self._leaving_bland(tableau=tableau, u=u)
 
-    def change_basis(self: Self, tableau: Tableau, j: int, ell: int) -> Tableau:
+    def change_basis(
+        self: Self, *, tableau: Tableau, j: int, ell: int
+    ) -> Tableau:
         r"""Passo 5: troca $B(\ell)$ por $j$ e devolve o novo tableau.
 
         A nova base é
@@ -245,12 +249,12 @@ class Solver(BaseModel):
     # Partes que dependem da regra anticiclagem
     # ------------------------------------------------------------------
 
-    def _entering_bland(self: Self, tableau: Tableau) -> int:
+    def _entering_bland(self: Self, *, tableau: Tableau) -> int:
         r"""Bland: o menor $j$ com $\bar{c}_j < 0$."""
         entering, *_ = np.flatnonzero(tableau.reduced_costs < -TOLERANCE)
         return int(entering)
 
-    def _entering_lexicographic(self: Self, tableau: Tableau) -> int:
+    def _entering_lexicographic(self: Self, *, tableau: Tableau) -> int:
         r"""Lexicográfica: um $j$ com $\bar{c}_j < 0$ (a regra não restringe
         a escolha; uma opção comum é o $j$ de menor $\bar{c}_j$)."""
         entering = np.random.choice(
@@ -258,7 +262,7 @@ class Solver(BaseModel):
         )
         return int(entering)
 
-    def _leaving_bland(self: Self, tableau: Tableau, u: FloatArray) -> int:
+    def _leaving_bland(self: Self, *, tableau: Tableau, u: FloatArray) -> int:
         r"""Bland: entre as linhas que atingem $\theta^*$, a de menor
         $B(\ell)$.
 
@@ -270,7 +274,7 @@ class Solver(BaseModel):
         return int(min(ties, key=lambda i: tableau.basis[i]))
 
     def _leaving_lexicographic(
-        self: Self, tableau: Tableau, u: FloatArray
+        self: Self, *, tableau: Tableau, u: FloatArray
     ) -> int:
         r"""Lexicográfica: a linha $\ell$ com $u_\ell > 0$ cuja linha do
         tableau dividida por $u_\ell$ é a lexicograficamente menor (veja

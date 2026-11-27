@@ -86,7 +86,7 @@ def _as_float_array(value: object) -> FloatArray:
     return array
 
 
-def _check_ndim(ndim: int, name: str) -> AfterValidator:
+def _check_ndim(*, ndim: int, name: str) -> AfterValidator:
     """Cria um validador que exige um array com `ndim` dimensões."""
 
     def check(value: FloatArray) -> FloatArray:
@@ -101,12 +101,16 @@ def _check_ndim(ndim: int, name: str) -> AfterValidator:
 
 
 type Matrix = Annotated[
-    FloatArray, BeforeValidator(_as_float_array), _check_ndim(2, "uma matriz")
+    FloatArray,
+    BeforeValidator(_as_float_array),
+    _check_ndim(ndim=2, name="uma matriz"),
 ]
 """Matriz de reais. Aceita listas de listas e converte para `FloatArray`."""
 
 type Vector = Annotated[
-    FloatArray, BeforeValidator(_as_float_array), _check_ndim(1, "um vetor")
+    FloatArray,
+    BeforeValidator(_as_float_array),
+    _check_ndim(ndim=1, name="um vetor"),
 ]
 """Vetor de reais. Aceita listas e converte para `FloatArray`."""
 
@@ -191,7 +195,7 @@ class Tableau(BaseModel):
     # Troca de base
     # ------------------------------------------------------------------
 
-    def with_basis(self: Self, basis: Sequence[int]) -> "Tableau":
+    def with_basis(self: Self, *, basis: Sequence[int]) -> "Tableau":
         r"""Devolve um novo tableau com os mesmos $A$, $b$ e $c$ e a base
         `basis`.
 
@@ -276,7 +280,7 @@ class Tableau(BaseModel):
         """
         return self.c - self.multipliers @ self.A
 
-    def column(self: Self, j: int) -> FloatArray:
+    def column(self: Self, *, j: int) -> FloatArray:
         r"""Coluna $j$ do tableau, $u = B^{-1} A_j$.
 
         Quando $x_j$ é a variável que entra na base, $u$ é a coluna pivô,
