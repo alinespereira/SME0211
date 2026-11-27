@@ -72,6 +72,12 @@ Os testes ficam em `tests/`. O pytest também roda os exemplos (doctests)
 das docstrings em `src/`. O log detalhado (nível DEBUG) de cada execução
 é gravado em `log/tests.log`.
 
+### CI
+
+A cada push na `main` e a cada pull request, o GitHub Actions
+(`.github/workflows/ci.yml`) roda `uv sync`, `ruff check`,
+`ruff format --check`, `mypy`, `pyright` e `pytest` (com os doctests).
+
 ## 4. Documentação
 
 A documentação da API é gerada com o [pdoc](https://pdoc.dev/) a partir
