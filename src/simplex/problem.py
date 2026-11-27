@@ -304,7 +304,12 @@ class StandardForm(BaseModel):
         1, \dots, 1)$ e a base inicial são as artificiais (colunas $N$ a
         $N + m - 1$), viável porque $\tilde{b} \geq 0$ e $B = I_m$.
         """
-        raise NotImplementedError
+        num_constraints, num_variables = self.A.shape
+        A = np.hstack([self.A, np.eye(num_constraints)])  # noqa: N806
+        b = self.b
+        c = self.c
+        basis = tuple(range(num_variables, num_variables + num_constraints))
+        return Tableau(A=A, b=b, c=c, basis=basis)
 
     def initial_tableau(self: Self, solver: Solver) -> Tableau | None:
         r"""Fase 1: encontra uma base viável para a forma padrão.
