@@ -163,6 +163,8 @@ class Portfolio(BaseModel):
     ...         Demand(label="boletos", quantity=1200, requires_finishing=True),
     ...     ]
     ... )
+    >>> portfolio.total
+    3500.0
     >>> portfolio.with_finishing
     2700.0
     >>> portfolio.without_finishing
@@ -182,7 +184,7 @@ class Portfolio(BaseModel):
     demands: list[Demand]
     """Demandas dos itens, na ordem em que foram pedidos."""
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @cached_property
     def total(self) -> float:
         r"""Total, em metros, dos itens demandados:
@@ -192,7 +194,7 @@ class Portfolio(BaseModel):
             start=0.0,
         )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @cached_property
     def with_finishing(self) -> float:
         r"""Total, em metros, dos itens que precisam de acabamento:
@@ -206,7 +208,7 @@ class Portfolio(BaseModel):
             start=0.0,
         )
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @cached_property
     def without_finishing(self) -> float:
         r"""Total, em metros, dos itens que não precisam de acabamento:
