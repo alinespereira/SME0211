@@ -178,27 +178,29 @@ class Tableau(BaseModel):
 
     @property
     def B(self: Self) -> FloatArray:  # noqa: N802
-        r"""Matriz base $B \in \mathbb{R}^{m \times m}$."""
+        r"""Matriz base $B = [A_{B(1)} \cdots A_{B(m)}] \in \mathbb{R}^{m \times m}$."""
         return self.A[:, list(self.basis)]
 
     @property
     def basic_costs(self: Self) -> FloatArray:
-        """Custos das variáveis básicas, $c_B$."""
+        r"""Custos das variáveis básicas, $c_B \in \mathbb{R}^m$."""
         return self.c[list(self.basis)]
 
     @property
     def basic_solution(self: Self) -> FloatArray:
-        """Valores das variáveis básicas, $x_B = B^{-1} b$."""
+        r"""Valores das variáveis básicas, $x_B = B^{-1} b \in \mathbb{R}^m$ (só as
+        $m$ básicas; o vetor completo é `solution`)."""
         return np.linalg.solve(self.B, self.b)
 
     @property
     def multipliers(self: Self) -> FloatArray:
-        r"""Multiplicadores do simplex, $p^\top = c_B^\top B^{-1}$."""
+        r"""Vetor multiplicador $p \in \mathbb{R}^m$, $p^\top = c_B^\top B^{-1}$."""
         return np.linalg.solve(self.B.T, self.basic_costs)
 
     @property
     def reduced_costs(self: Self) -> FloatArray:
-        r"""Custos reduzidos, $\bar{c}^\top = c^\top - p^\top A$."""
+        r"""Custos reduzidos, $\bar{c}^\top = c^\top - p^\top A \in \mathbb{R}^n$, com
+        $p^\top = c_B^\top B^{-1}$ (vetor multiplicador)."""
         return self.c - self.multipliers @ self.A
 
     def column(self: Self, *, j: int) -> FloatArray:
@@ -207,7 +209,8 @@ class Tableau(BaseModel):
 
     @property
     def solution(self: Self) -> FloatArray:
-        r"""Solução básica $x \in \mathbb{R}^n$, com as não básicas nulas."""
+        r"""Solução atual $x \in \mathbb{R}^n$: $x_B = B^{-1}b \in \mathbb{R}^m$ nas
+        básicas e $x_N = 0$."""
         x = np.zeros(self.num_variables)
         x[list(self.basis)] = self.basic_solution
         return x
