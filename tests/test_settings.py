@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from printing_company.settings import ENV_FILE, ROOT_DIR, Settings
+from printing_company.settings import Settings
 
 
 @pytest.fixture(autouse=True)
@@ -46,13 +46,16 @@ def test_environment_wins_over_env_file(
 
 def test_env_example_has_paper_values() -> None:
     """O `.env.example` versionado tem os valores padrão do artigo."""
-    example = Settings(_env_file=ROOT_DIR / ".env.example")
+    root = Settings(_env_file=None).root_dir
+    example = Settings(_env_file=root / ".env.example")
     assert example.shift_hours == Settings(_env_file=None).shift_hours
     assert example.energy_price == Settings(_env_file=None).energy_price
 
 
 def test_env_file_is_at_project_root() -> None:
-    assert ENV_FILE == ROOT_DIR / ".env"
+    root = Settings(_env_file=None).root_dir
+    assert (root / "src" / "printing_company").is_dir()
+    assert Settings.model_config.get("env_file") == root / ".env"
 
 
 def test_fields_can_be_given() -> None:
@@ -62,3 +65,11 @@ def test_fields_can_be_given() -> None:
 def test_energy_price_must_be_positive() -> None:
     with pytest.raises(ValidationError, match="greater than 0"):
         Settings(energy_price=0)
+
+
+def test_repr_has_no_absolute_paths() -> None:
+    """Os caminhos ficam fora do `repr`, para não aparecerem na
+    documentação gerada pelo pdoc."""
+    assert repr(Settings(_env_file=None)) == (
+        "Settings(shift_hours=10.0, energy_price=0.86)"
+    )

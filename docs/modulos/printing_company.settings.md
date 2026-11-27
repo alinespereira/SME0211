@@ -12,8 +12,8 @@ Cada campo pode ser trocado, nesta ordem de prioridade, por
 
 1. uma variável de ambiente com o nome do campo (em maiúsculas ou
    minúsculas): `SHIFT_HOURS=8 uv run printing-company`;
-2. uma linha no arquivo `.env` da raiz do projeto (`ENV_FILE`), que não
-   vai para o git. O `.env.example`, versionado, tem os valores do
+2. uma linha no arquivo `.env` da raiz do projeto (lido de lá mesmo
+   quando o comando é chamado de outra pasta), que não vai para o git. O `.env.example`, versionado, tem os valores do
    artigo: copie-o para `.env` e mude o que quiser;
 3. o valor padrão do campo (o do artigo).
 
