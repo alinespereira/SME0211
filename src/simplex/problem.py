@@ -56,7 +56,16 @@ _FLIPPED_SENSE: dict[ConstraintSense, ConstraintSense] = {
 
 
 class Constraint(BaseModel):
-    r"""Uma restrição $a_i^\top x \;\square_i\; b_i$."""
+    r"""Uma restrição $a_i^\top x \;\square_i\; b_i$.
+
+    **Exemplo:** $x_1 + 3 x_2 \leq 6$.
+
+    >>> k = Constraint(coefs=[1, 3], sense="<=", rhs=6)
+    >>> k.coefs.tolist()
+    [1.0, 3.0]
+    >>> k.rhs
+    6.0
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
@@ -71,7 +80,42 @@ class Constraint(BaseModel):
 
 
 class Problem(BaseModel):
-    """Problema de otimização linear, como escrito no papel."""
+    r"""Problema de otimização linear, como escrito no papel.
+
+    **Exemplo:** o problema de `examples/pequeno.toml`,
+
+    $$
+    \begin{aligned}
+    \max \quad & 3 x_1 + 2 x_2 \cr
+    \text{s.a.} \quad & x_1 + x_2 \leq 4, \cr
+    & x_1 + 3 x_2 \leq 6, \cr
+    & x_1 \geq 1, \cr
+    & x \geq 0.
+    \end{aligned}
+    $$
+
+    >>> p = Problem(
+    ...     sense="max",
+    ...     c=[3, 2],
+    ...     constraints=(
+    ...         Constraint(coefs=[1, 1], sense="<=", rhs=4),
+    ...         Constraint(coefs=[1, 3], sense="<=", rhs=6),
+    ...         Constraint(coefs=[1, 0], sense=">=", rhs=1),
+    ...     ),
+    ... )
+    >>> p.variable_names
+    ('x1', 'x2')
+    >>> solution = p.solve()
+    >>> solution.status
+    <Status.OPTIMAL: 'optimal'>
+    >>> solution.x.tolist()
+    [4.0, 0.0]
+    >>> solution.objective
+    12.0
+
+    O mesmo problema pode ser lido de um arquivo com
+    `Problem.from_toml(path="examples/pequeno.toml")`.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
@@ -254,7 +298,46 @@ class StandardForm(BaseModel):
     r"""Problema na forma padrão $\min \tilde{c}^\top \tilde{x}$,
     $\tilde{A} \tilde{x} = \tilde{b}$, $\tilde{x} \geq 0$, com
     $\tilde{b} \geq 0$, mais o que é preciso para voltar ao problema
-    original."""
+    original.
+
+    **Exemplo:** a forma padrão do problema do exemplo de `Problem`. O
+    $\max$ vira $\min$ (custos com sinal trocado), as restrições
+    $\leq$ ganham folgas `s1` e `s2` e a restrição $\geq$ ganha o excesso
+    `e3`.
+
+    >>> p = Problem(
+    ...     sense="max",
+    ...     c=[3, 2],
+    ...     constraints=(
+    ...         Constraint(coefs=[1, 1], sense="<=", rhs=4),
+    ...         Constraint(coefs=[1, 3], sense="<=", rhs=6),
+    ...         Constraint(coefs=[1, 0], sense=">=", rhs=1),
+    ...     ),
+    ... )
+    >>> sf = p.to_standard_form()
+    >>> sf.names
+    ('x1', 'x2', 's1', 's2', 'e3')
+    >>> for row in sf.A:
+    ...     print(row.tolist())
+    [1.0, 1.0, 1.0, 0.0, 0.0]
+    [1.0, 3.0, 0.0, 1.0, 0.0]
+    [1.0, 0.0, 0.0, 0.0, -1.0]
+    >>> sf.c.tolist()
+    [-3.0, -2.0, 0.0, 0.0, 0.0]
+    >>> sf.objective_sign
+    -1
+
+    A Fase 1 começa com as artificiais (colunas 5, 6 e 7) na base e
+    termina numa base viável só com colunas de $\tilde{A}$:
+
+    >>> sf.phase_one_tableau().basis
+    (5, 6, 7)
+    >>> t = sf.initial_tableau(solver=Solver())
+    >>> all(j < 5 for j in t.basis)
+    True
+    >>> sf.original_solution(x=t.solution).shape
+    (2,)
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
@@ -400,7 +483,23 @@ class StandardForm(BaseModel):
 
 
 class Solution(BaseModel):
-    """Resultado de `Problem.solve`, nas variáveis originais."""
+    r"""Resultado de `Problem.solve`, nas variáveis originais.
+
+    **Exemplo:** um problema inviável ($x_1 \leq 1$ e $x_1 \geq 2$).
+
+    >>> p = Problem(
+    ...     c=[1],
+    ...     constraints=(
+    ...         Constraint(coefs=[1], sense="<=", rhs=1),
+    ...         Constraint(coefs=[1], sense=">=", rhs=2),
+    ...     ),
+    ... )
+    >>> solution = p.solve()
+    >>> solution.status
+    <Status.INFEASIBLE: 'infeasible'>
+    >>> solution.x is None and solution.objective is None
+    True
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
