@@ -1,0 +1,36 @@
+/* Árvore de módulos (module_tree.html.jinja2). */
+nav.pdoc .module-tree {
+    margin-left: 0;
+}
+
+nav.pdoc .module-tree ul {
+    padding-left: 1rem;
+}
+
+nav.pdoc .module-tree summary {
+    cursor: pointer;
+    list-style-position: inside;
+}
+
+/* Desfaz o recuo que o pdoc dá aos links da barra lateral. */
+nav.pdoc .module-tree li a {
+    display: inline-block;
+    padding: .2rem .25rem;
+}
+
+/* Folhas alinhadas com o nome dos pacotes (depois da seta). */
+nav.pdoc .module-tree li > a {
+    padding-left: 1.1rem;
+}
+
+nav.pdoc .module-tree li:hover {
+    background-color: transparent;
+}
+
+nav.pdoc .module-tree a:hover {
+    background-color: var(--nav-hover);
+}
+
+nav.pdoc .module-tree a.current {
+    font-weight: bold;
+}

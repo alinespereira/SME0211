@@ -1,0 +1,9 @@
+{#
+Página inicial: a lista de módulos vira uma árvore que expande ao clicar.
+#}
+{% extends "default/index.html.jinja2" %}
+{% from "module_tree.html.jinja2" import module_tree %}
+{% block nav %}
+    <h2>Módulos</h2>
+    {{ module_tree(all_modules.keys() | list, "") }}
+{% endblock %}
