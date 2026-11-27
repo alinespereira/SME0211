@@ -1,16 +1,31 @@
 r"""Modelo de otimização linear da gráfica: a versão relaxada do artigo,
-focada no tempo de operação das máquinas.
+com dois objetivos possíveis, o tempo de operação das máquinas ou o
+consumo de energia.
 
 O artigo *Energy consumption optimization in a printing company* propõe um
 modelo de programação linear inteira, com variáveis $z_{im}$ (metros do
 item $i$ impressos na máquina $m$), $w_{in}$ (metros do item $i \in F$
 acabados na máquina $n$) e variáveis binárias de designação $x_{im}$ e
-$y_{in}$. A função objetivo (16) do artigo minimiza o tempo de operação:
+$y_{in}$. O artigo trata de dois objetivos. A função objetivo (16)
+minimiza o tempo de operação:
 
 $$
 \min \sum_{m \in M} \sum_{i \in I} (T_{im} z_{im} + A_{im} x_{im})
    + \sum_{n \in N} \sum_{i \in F} (T_{in} w_{in} + A_{in} y_{in}).
 $$
+
+A função objetivo (1) minimiza o custo de energia: cada hora de operação
+da máquina $m$ consome $kw_m$ kWh (a potência da Tabela 1,
+`Machine.consumption`), e o kWh custa $c$ reais,
+
+$$
+\min c \left[ \sum_{m \in M} kw_m \sum_{i \in I}
+   (T_{im} z_{im} + A_{im} x_{im})
+   + \sum_{n \in N} kw_n \sum_{i \in F} (T_{in} w_{in} + A_{in} y_{in})
+   \right].
+$$
+
+As restrições são as mesmas nos dois casos.
 
 **Relaxação.** Aqui ficam só a parte contínua do tempo, as restrições de
 capacidade (2) e (3) e as restrições de demanda (4) e (5):
@@ -37,13 +52,16 @@ t_n = \frac{w_n}{v_n}, \quad n \in N.
 $$
 
 É só uma mudança de escala de cada variável ($z_m = v_m t_m$, com
-$v_m > 0$), então os dois modelos têm as mesmas soluções, e a função
-objetivo passa a ser a soma das horas. Somando (4) em $i \in I$ e (5) em
+$v_m > 0$), então os dois modelos têm as mesmas soluções. A função
+objetivo de tempo passa a ser a soma das horas, e a de energia, a soma
+das horas ponderada pelas potências (a tarifa $c > 0$ é uma constante
+que multiplica o objetivo e não muda a solução ótima, então fica de
+fora: o objetivo é a energia, em kWh). Somando (4) em $i \in I$ e (5) em
 $i \in F$, o modelo fica
 
 $$
 \begin{aligned}
-\min \quad & \sum_{m \in M} t_m + \sum_{n \in N} t_n \cr
+\min \quad & \sum_{m \in M} p_m t_m + \sum_{n \in N} p_n t_n \cr
 \text{s.a.} \quad & \sum_{m \in M} v_m t_m \geq \sum_{i \in I} D_i, \cr
 & \sum_{n \in N} v_n t_n \geq \sum_{i \in F} D_i, \cr
 & t_m \leq T, \quad m \in M, \cr
@@ -52,7 +70,14 @@ $$
 \end{aligned}
 $$
 
-com $t$ em horas e $v$ em metros por hora. As restrições de demanda são
+com $t$ em horas e $v$ em metros por hora. Os custos $p$ dependem do
+objetivo (`Objective`):
+
+- `Objective.TIME`: $p_m = 1$, e o objetivo é o total de horas ligadas;
+- `Objective.ENERGY`: $p_m = kw_m$, e o objetivo é a energia consumida
+  na produção, em kWh.
+
+As restrições de demanda são
 escritas com $\geq$, mas, como os custos são positivos, no ótimo elas
 valem com igualdade, como as restrições (4) e (5) do artigo. Para que os
 coeficientes fiquem na mesma escala que os custos (1) e as capacidades
@@ -63,13 +88,17 @@ milhares de metros.
 O problema é viável se, e só se, as máquinas dão conta da demanda no
 horizonte: $T \sum_m v_m \geq \sum_{i \in I} D_i$ e
 $T \sum_n v_n \geq \sum_{i \in F} D_i$ (veja `min_capacity`). Sem as
-capacidades (`capacity=None`), a solução ótima liga só a impressora mais
-rápida e a máquina de acabamento mais rápida; com elas, as máquinas são
-ligadas da mais rápida para a mais lenta, até cobrir a demanda.
-`build_problem` monta esse modelo como um `simplex.Problem`.
+capacidades (`capacity=None`), a solução ótima liga só a impressora e a
+máquina de acabamento de menor custo por metro, $p_m / v_m$; com elas, as
+máquinas são ligadas em ordem crescente de $p_m / v_m$, até cobrir a
+demanda. No objetivo de tempo, essa é a ordem da mais rápida para a mais
+lenta; no de energia, a da que gasta menos energia por metro,
+$kw_m / v_m$, para a que gasta mais. `build_problem` monta esse modelo
+como um `simplex.Problem`.
 """
 
 from collections.abc import Sequence
+from enum import StrEnum
 
 import numpy as np
 
@@ -80,7 +109,13 @@ from printing_company.problem.spec import (
 )
 from simplex import Constraint, Problem
 
-__all__ = ["SCALE", "SHIFT_HOURS", "build_problem", "min_capacity"]
+__all__ = [
+    "SCALE",
+    "SHIFT_HOURS",
+    "Objective",
+    "build_problem",
+    "min_capacity",
+]
 
 SHIFT_HOURS = 8.0 + 2.0
 """Horas de um turno diário no artigo: 8 horas normais mais até 2 horas
@@ -91,19 +126,44 @@ SCALE = 1_000.0
 modelo em milhares de metros (por hora)."""
 
 
+class Objective(StrEnum):
+    r"""O que o modelo minimiza.
+
+    O valor (`"time"` ou `"energy"`) é o usado na opção `--objective` do
+    comando `printing-company`.
+
+    >>> Objective("energy")
+    <Objective.ENERGY: 'energy'>
+    >>> [str(o) for o in Objective]
+    ['time', 'energy']
+    """
+
+    TIME = "time"
+    r"""Tempo de operação, $\sum_m t_m$, em horas (objetivo (16) do artigo,
+    sem os setups)."""
+
+    ENERGY = "energy"
+    r"""Consumo de energia, $\sum_m kw_m t_m$, em kWh (objetivo (1) do
+    artigo, sem os setups e sem a tarifa)."""
+
+
 def build_problem(
     *,
     portfolio: Portfolio,
     printers: Sequence[PrintingMachine],
     finishings: Sequence[FinishingMachine],
     capacity: float | None = None,
+    objective: Objective = Objective.TIME,
 ) -> Problem:
-    r"""Monta o modelo relaxado (veja o módulo) de tempo de operação.
+    r"""Monta o modelo relaxado (veja o módulo).
 
     As variáveis são, nesta ordem, as horas $t_m$ de cada impressora de
     `printers` e $t_n$ de cada máquina de acabamento de `finishings`, e
-    levam os nomes das máquinas (`Machine.id`). Todos os custos são 1: o
-    objetivo é o total de horas ligadas. As restrições são, nesta ordem,
+    levam os nomes das máquinas (`Machine.id`). Os custos dependem de
+    `objective`: com `Objective.TIME`, todos são 1, e o objetivo é o total
+    de horas ligadas; com `Objective.ENERGY`, o custo de cada máquina é a
+    sua potência $kw_m$ (`Machine.consumption`), e o objetivo é a energia
+    consumida, em kWh. As restrições são, nesta ordem,
 
     $$
     \begin{aligned}
@@ -129,7 +189,8 @@ def build_problem(
     - `finishings`: as máquinas de acabamento $n \in N$;
     - `capacity`: a capacidade $T$, em horas, de cada máquina no horizonte
       (por exemplo, `2 * SHIFT_HOURS` para dois dias). Com `None`, as
-      restrições de capacidade não entram no modelo.
+      restrições de capacidade não entram no modelo;
+    - `objective`: o que minimizar, o tempo (padrão) ou a energia.
 
     **Levanta:** `ValueError` se `capacity` não for positiva.
 
@@ -253,6 +314,62 @@ def build_problem(
     Traceback (most recent call last):
         ...
     ValueError: capacity deve ser positiva, mas é 0.
+
+    **Energia.** Com `Objective.ENERGY`, os custos são as potências, em
+    kW. No exemplo pequeno, a `P1` gasta $40 / 10\,500 \approx 0{,}0038$
+    kWh por metro e a `P2`, $112 / 3\,000 \approx 0{,}037$, então a
+    impressão continua na `P1`, e o consumo é
+    $40 \cdot 3{,}33 + 40 \cdot 1{,}92 \approx 210{,}26$ kWh:
+
+    >>> problem = build_problem(
+    ...     portfolio=portfolio,
+    ...     printers=printers,
+    ...     finishings=finishings,
+    ...     objective=Objective.ENERGY,
+    ... )
+    >>> problem.c.tolist()  # kW
+    [40.0, 112.0, 40.0]
+    >>> solution = problem.solve()
+    >>> [round(t, 4) for t in solution.x.tolist()]
+    [3.3333, 0.0, 1.9231]
+    >>> round(solution.objective, 2)  # kWh
+    210.26
+
+    Com os dados do artigo, as máquinas que gastam menos energia por metro
+    não são as mais rápidas. A `Print05` (2,2 kW e 9 000 m/h, ou 0,00024
+    kWh/m) é a mais econômica, e a `Print04`, a mais rápida, vem em
+    segundo (0,0019 kWh/m). No acabamento, a `Finish02`, a mais rápida,
+    é a que mais gasta (112 kW, 0,0093 kWh/m); a `Finish03` (0,0046 kWh/m)
+    e a `Finish01` (0,0051 kWh/m) gastam a metade. Na carteira I, com dois
+    dias de turno, a impressão vai para a `Print05` e a `Print04`, nas 20
+    horas, e o resto para a `Print01`; o acabamento, para a `Finish03` e,
+    o que passa das 20 horas dela, para a `Finish01`:
+
+    >>> problem = build_problem(
+    ...     portfolio=data.portfolios[0],
+    ...     printers=data.printers,
+    ...     finishings=data.finishers,
+    ...     capacity=2 * SHIFT_HOURS,
+    ...     objective=Objective.ENERGY,
+    ... )
+    >>> solution = problem.solve()
+    >>> {
+    ...     name: round(t, 4)
+    ...     for name, t in zip(problem.variable_names, solution.x.tolist())
+    ...     if t > 0
+    ... }  # doctest: +NORMALIZE_WHITESPACE
+    {'Print01': 10.5714, 'Print04': 20.0, 'Print05': 20.0,
+     'Finish01': 1.1538, 'Finish03': 20.0}
+    >>> round(solution.objective, 2)  # kWh
+    1993.01
+
+    No objetivo de tempo, a mesma carteira gastava
+    $40 \cdot 20 + 24 \cdot 20 + 2{,}2 \cdot 9 + 112 \cdot 18{,}75
+    = 3\,399{,}8$ kWh (sem os setups), 70% a mais. Em troca, o
+    tempo total sobe de 67,75 h para 71,73 h:
+
+    >>> round(float(solution.x.sum()), 2)  # horas
+    71.73
     """
     if capacity is not None and capacity <= 0:
         raise ValueError(f"capacity deve ser positiva, mas é {capacity}.")
@@ -260,8 +377,13 @@ def build_problem(
     machines = (*printers, *finishings)
     names = tuple(machine.id for machine in machines)
 
-    # Custo 1 para cada variável: o objetivo é a soma das horas ligadas.
-    c = np.ones(len(machines), dtype=np.float64)
+    # Tempo: custo 1 para cada variável (a soma das horas ligadas).
+    # Energia: a potência de cada máquina, em kW (kWh por hora ligada).
+    match objective:
+        case Objective.TIME:
+            c = np.ones(len(machines), dtype=np.float64)
+        case Objective.ENERGY:
+            c = np.array([m.consumption for m in machines], dtype=np.float64)
 
     # Velocidades em milhares de metros por hora. Só as impressoras
     # imprimem e só as máquinas de acabamento acabam: cada restrição de
