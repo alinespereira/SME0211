@@ -117,8 +117,8 @@ cp .env.example .env   # e edite o .env
 SHIFT_HOURS=8 uv run printing-company   # ou só numa execução
 ```
 
-O `.env` está no `.gitignore`. Os doctests usam os valores do artigo,
-então rode os testes sem `.env` (ou com os valores do `.env.example`).
+O `.env` está no `.gitignore`. Os testes usam os valores do artigo,
+então rode-os sem `.env` (ou com os valores do `.env.example`).
 
 ## 5. Rodar os testes
 
@@ -126,20 +126,22 @@ então rode os testes sem `.env` (ou com os valores do `.env.example`).
 uv run pytest
 ```
 
-Os testes ficam em `tests/`. O pytest também roda os exemplos (doctests)
-das docstrings em `src/`. O log detalhado (nível DEBUG) de cada execução
-é gravado em `log/tests.log`.
+Os testes ficam em `tests/`, um arquivo por módulo. O log detalhado
+(nível DEBUG) de cada execução é gravado em `log/tests.log`.
 
 ### CI
 
 A cada push na `main` e a cada pull request, o GitHub Actions
 (`.github/workflows/ci.yml`) roda `uv sync`, `ruff check`,
-`ruff format --check`, `mypy`, `pyright` e `pytest` (com os doctests).
+`ruff format --check`, `mypy`, `pyright` e `pytest`.
 
 ## 6. Documentação
 
-A documentação da API é gerada com o [pdoc](https://pdoc.dev/) a partir
-das docstrings. As fórmulas estão em LaTeX e são renderizadas com MathJax
+A documentação da API é gerada com o [pdoc](https://pdoc.dev/). As
+docstrings no código são curtas; a teoria de cada módulo (os modelos em
+LaTeX, os passos do método, as convenções) fica em `docs/modulos/`, um
+arquivo Markdown por módulo, que a docstring do módulo inclui com
+`.. include::`. As fórmulas estão em LaTeX e são renderizadas com MathJax
 (opção `--math`), que é carregado da internet, então é preciso estar
 conectado para ver as fórmulas. O template em `pdoc-templates/` esconde o
 `= PydanticUndefined` que o pdoc mostraria nos campos obrigatórios dos
@@ -172,11 +174,30 @@ O servidor abre o navegador sozinho e atualiza a página quando um arquivo
 `simplex printing_company` por `simplex`, por exemplo. A pasta `docs/api/`
 é gerada e está no `.gitignore`.
 
+## 7. Notebooks
+
+Os exemplos de uso ficam em `notebooks/`:
+
+- `01_simplex.ipynb`: o pacote `simplex` passo a passo (forma padrão, Fase
+  1, tableau, iterações do `Solver` e regras anticiclagem);
+- `02_grafica.ipynb`: as carteiras do artigo, os objetivos de tempo e de
+  energia e as tabelas do comando `printing-company`.
+
+Cada um tem um botão "Open in Colab" no topo e começa com uma célula
+`!pip install` que instala o projeto direto do GitHub; localmente, com o
+ambiente do `uv sync`, essa célula pode ser pulada. Para abrir localmente:
+
+```sh
+uv run --with jupyterlab jupyter lab notebooks/
+```
+
 ## Estrutura
 
 ```text
 docs/                  enunciado e artigo de referência (docs/api/ é gerada)
+  modulos/             teoria de cada módulo, incluída na documentação do pdoc
 examples/              problemas de exemplo em TOML (simplex.Problem.from_toml)
+notebooks/             exemplos de uso (abrem no Colab)
 pdoc-templates/        template do pdoc
 src/simplex/           método simplex: problem, tableau, solver, display, logs, defaults
 src/printing_company/  comando printing-company, settings e report (tabelas da saída)

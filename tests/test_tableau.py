@@ -180,3 +180,12 @@ def test_table(small: Tableau) -> None:
         ],
         atol=1e-12,
     )
+
+
+def test_column(small: Tableau) -> None:
+    np.testing.assert_allclose(small.column(j=1), [1, 3])
+
+
+def test_variable_names_default() -> None:
+    t = Tableau(A=[[1, 1]], b=[1], c=[0, 0], basis=(0,))
+    assert t.variable_names == ("x1", "x2")

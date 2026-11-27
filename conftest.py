@@ -1,4 +1,4 @@
-"""Configuração do pytest comum aos testes e aos doctests (em `src/`)."""
+"""Configuração do pytest comum a todos os testes."""
 
 import logging
 from collections.abc import Iterator
@@ -13,8 +13,8 @@ def _quiet_rich_handler() -> Iterator[None]:
 
     O pytest baixa o nível do logger raiz para DEBUG (por causa do
     `log_file_level` do pytest.ini), e o `RichHandler` passaria a escrever
-    os logs de DEBUG na saída padrão, que os doctests comparam com a saída
-    esperada. O log completo continua indo para `log/tests.log`.
+    os logs de DEBUG na saída padrão, que alguns testes comparam com a
+    saída esperada. O log completo continua indo para `log/tests.log`.
     """
     handlers = [
         h for h in logging.getLogger().handlers if isinstance(h, RichHandler)

@@ -8,6 +8,7 @@ das variáveis de ambiente."""
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from printing_company.settings import Settings
 
@@ -55,3 +56,20 @@ def test_env_file_is_at_project_root() -> None:
     root = Settings(_env_file=None).root_dir
     assert (root / "src" / "printing_company").is_dir()
     assert Settings.model_config.get("env_file") == root / ".env"
+
+
+def test_fields_can_be_given() -> None:
+    assert Settings(shift_hours=8).shift_hours == 8.0
+
+
+def test_energy_price_must_be_positive() -> None:
+    with pytest.raises(ValidationError, match="greater than 0"):
+        Settings(energy_price=0)
+
+
+def test_repr_has_no_absolute_paths() -> None:
+    """Os caminhos ficam fora do `repr`, para não aparecerem na
+    documentação gerada pelo pdoc."""
+    assert repr(Settings(_env_file=None)) == (
+        "Settings(shift_hours=10.0, energy_price=0.86)"
+    )
