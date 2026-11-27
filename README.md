@@ -62,7 +62,22 @@ uv sync --no-dev
 Não é preciso ativar o ambiente virtual: basta prefixar os comandos com
 `uv run`, que usa o `.venv/` automaticamente.
 
-## 3. Rodar os testes
+## 3. Configurar (opcional)
+
+Os parâmetros do cenário (horas de um turno e tarifa de energia) têm os
+valores do artigo e podem ser trocados sem mexer no código, por uma
+variável de ambiente ou por um arquivo `.env` na raiz do projeto (veja
+`printing_company.settings`). A variável de ambiente vence o `.env`.
+
+```sh
+cp .env.example .env   # e edite o .env
+SHIFT_HOURS=8 uv run printing-company   # ou só numa execução
+```
+
+O `.env` está no `.gitignore`. Os doctests usam os valores do artigo,
+então rode os testes sem `.env` (ou com os valores do `.env.example`).
+
+## 4. Rodar os testes
 
 ```sh
 uv run pytest
@@ -78,7 +93,7 @@ A cada push na `main` e a cada pull request, o GitHub Actions
 (`.github/workflows/ci.yml`) roda `uv sync`, `ruff check`,
 `ruff format --check`, `mypy`, `pyright` e `pytest` (com os doctests).
 
-## 4. Documentação
+## 5. Documentação
 
 A documentação da API é gerada com o [pdoc](https://pdoc.dev/) a partir
 das docstrings. As fórmulas estão em LaTeX e são renderizadas com MathJax

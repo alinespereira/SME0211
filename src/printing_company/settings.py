@@ -11,12 +11,16 @@ das restrições de demanda (`printing_company.problem.model.SCALE`) é
 parte da formulação do modelo.
 
 O objeto `settings` é carregado na importação e usado em todo o pacote.
-Para mudar um valor, defina a variável de ambiente com o nome do campo
-(em maiúsculas ou minúsculas):
+Cada campo pode ser trocado, nesta ordem de prioridade, por
 
-```sh
-SHIFT_HOURS=8 uv run printing-company   # turnos sem horas extras
-```
+1. uma variável de ambiente com o nome do campo (em maiúsculas ou
+   minúsculas): `SHIFT_HOURS=8 uv run printing-company`;
+2. uma linha no arquivo `.env` da raiz do projeto (`ENV_FILE`), que não
+   vai para o git. O `.env.example`, versionado, tem os valores do
+   artigo: copie-o para `.env` e mude o que quiser;
+3. o valor padrão do campo (o do artigo).
+
+Variáveis do `.env` que não são campos de `Settings` são ignoradas.
 
 >>> Settings(shift_hours=8).shift_hours
 8.0
@@ -34,22 +38,30 @@ from typing import Self
 from pydantic import DirectoryPath, Field, PositiveFloat, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-__all__ = ["ROOT_DIR", "Settings", "settings"]
+__all__ = ["ENV_FILE", "ROOT_DIR", "Settings", "settings"]
 
 ROOT_DIR = Path(__file__).parent.parent.parent.resolve()
 """Raiz do projeto (a pasta que contém `src/`)."""
+
+ENV_FILE = ROOT_DIR / ".env"
+"""Arquivo `.env` lido por `Settings`, na raiz do projeto (e não na pasta
+de onde o comando é chamado). Se não existir, é ignorado."""
 
 
 class Settings(BaseSettings):
     """Configurações imutáveis do projeto.
 
     Os valores podem ser trocados por variáveis de ambiente (por exemplo,
-    `ROOT_DIR` ou `SHIFT_HOURS`), como em todo
-    `pydantic_settings.BaseSettings`.
+    `ROOT_DIR` ou `SHIFT_HOURS`) ou pelo arquivo `ENV_FILE`, como em todo
+    `pydantic_settings.BaseSettings` (veja o módulo). Para ler outro
+    arquivo, use `Settings(_env_file=caminho)`.
     """
 
     model_config = SettingsConfigDict(
         frozen=True,
+        env_file=ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     root_dir: DirectoryPath = Field(default=ROOT_DIR)
