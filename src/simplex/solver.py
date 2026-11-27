@@ -184,7 +184,7 @@ class Solver(BaseModel):
         Use a tolerância `simplex.tableau.TOLERANCE`: considere
         $\bar{c}_j < 0$ só quando $\bar{c}_j < -\varepsilon$.
         """
-        return all(tableau.reduced_costs >= TOLERANCE)
+        return bool(np.all(tableau.reduced_costs >= -TOLERANCE))
 
     def entering_variable(self: Self, tableau: Tableau) -> int:
         r"""Passo 2: escolhe o índice $j$ da variável que entra na base.
@@ -242,17 +242,16 @@ class Solver(BaseModel):
 
     def _entering_bland(self: Self, tableau: Tableau) -> int:
         r"""Bland: o menor $j$ com $\bar{c}_j < 0$."""
-        entering, *_ = np.flatnonzero(tableau.reduced_costs < TOLERANCE).astype(
-            int
-        )
-        return entering
+        entering, *_ = np.flatnonzero(tableau.reduced_costs < -TOLERANCE)
+        return int(entering)
 
     def _entering_lexicographic(self: Self, tableau: Tableau) -> int:
         r"""Lexicográfica: um $j$ com $\bar{c}_j < 0$ (a regra não restringe
         a escolha; uma opção comum é o $j$ de menor $\bar{c}_j$)."""
-        return np.random.choice(
-            np.flatnonzero(tableau.reduced_costs < TOLERANCE).astype(int)
+        entering = np.random.choice(
+            np.flatnonzero(tableau.reduced_costs < -TOLERANCE).astype(int)
         )
+        return int(entering)
 
     def _leaving_bland(self: Self, tableau: Tableau, u: FloatArray) -> int:
         r"""Bland: entre as linhas que atingem $\theta^*$, a de menor
@@ -260,11 +259,10 @@ class Solver(BaseModel):
 
         Supõe que $u_i > 0$ para algum $i$.
         """
-        thetas = tableau.basic_solution / u
-        theta_min = thetas.min()
-        upper_bound = theta_min + TOLERANCE
-        ell = int(np.flatnonzero(thetas < upper_bound)[0])
-        return ell
+        candidates = np.flatnonzero(u > TOLERANCE)
+        thetas = tableau.basic_solution[candidates] / u[candidates]
+        ties = candidates[thetas <= thetas.min() + TOLERANCE]
+        return int(min(ties, key=lambda i: tableau.basis[i]))
 
     def _leaving_lexicographic(
         self: Self, tableau: Tableau, u: FloatArray
@@ -278,6 +276,6 @@ class Solver(BaseModel):
         """
         candidates = np.flatnonzero(u > TOLERANCE)
         rows = tableau.table[1:, :]
-        thetas = rows[candidates] / u[candidates]
+        thetas = rows[candidates] / u[candidates, None]
         ell = int(candidates[np.lexsort(thetas.T[::-1])[0]])
         return ell
