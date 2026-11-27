@@ -121,3 +121,53 @@ def test_solver_skips_rendering_without_debug(
     with caplog.at_level(logging.INFO, logger="simplex.solver"):
         Solver().solve(tableau=tableau)
     assert caplog.records == []
+
+
+@pytest.mark.usefixtures("_restore_root_level")
+@pytest.mark.parametrize(
+    ("args", "label"),
+    [
+        ([], "tempo"),
+        (["--objective", "time"], "tempo"),
+        (["--objective", "energy"], "energia"),
+        (["-o", "ENERGY"], "energia"),
+    ],
+)
+def test_main_objective_option(
+    caplog: pytest.LogCaptureFixture, args: list[str], label: str
+) -> None:
+    with caplog.at_level(logging.INFO, logger="printing_company"):
+        result = CliRunner().invoke(main, [*args, "-p", "1"])
+    assert result.exit_code == 0, result.output
+    headers = [
+        r.getMessage()
+        for r in caplog.records
+        if r.getMessage().startswith(">>> ")
+    ]
+    assert headers == [f">>> Portfolio I: 2 turnos, objetivo: {label}"]
+
+
+@pytest.mark.usefixtures("_restore_root_level")
+def test_main_energy_objective_uses_less_energy(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Minimizar a energia gasta menos kWh que minimizar o tempo."""
+
+    def energy(objective: str) -> float:
+        caplog.clear()
+        with caplog.at_level(logging.INFO, logger="printing_company"):
+            result = CliRunner().invoke(main, ["-o", objective, "-p", "1"])
+        assert result.exit_code == 0, result.output
+        (summary,) = (
+            r.getMessage()
+            for r in caplog.records
+            if r.getMessage().startswith("Tempo real")
+        )
+        return float(summary.split("energia: ")[1].split(" kWh")[0])
+
+    assert energy("energy") < energy("time")
+
+
+def test_main_rejects_unknown_objective() -> None:
+    result = CliRunner().invoke(main, ["--objective", "cost"])
+    assert result.exit_code != 0

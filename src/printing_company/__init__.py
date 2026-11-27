@@ -5,8 +5,9 @@ A gráfica recebe uma carteira de pedidos e precisa decidir quantos metros
 de cada item $i \in I$ produzir em cada máquina de impressão $m \in M$ e,
 para os itens que exigem acabamento ($i \in F$), em cada máquina de
 acabamento $n \in N$. O trabalho usa uma versão relaxada (contínua) do
-modelo do artigo, focada no tempo de impressão, resolvida com o pacote
-`simplex`.
+modelo do artigo, resolvida com o pacote `simplex`, que minimiza o tempo
+de operação das máquinas ou o consumo de energia (veja
+`printing_company.problem.model.Objective`).
 
 **Módulos:**
 
@@ -19,12 +20,14 @@ modelo do artigo, focada no tempo de impressão, resolvida com o pacote
 carteiras do artigo. Com `--debug`, mostra também o tableau de cada
 iteração do simplex, com a variável que entra, a que sai e o pivô em
 destaque (veja `simplex.display`). Os tableaux da Fase 1 só aparecem com
-`--phase-one`:
+`--phase-one`. Com `--objective energy`, minimiza o consumo de energia
+em vez do tempo:
 
 ```sh
 uv run printing-company --debug              # as três carteiras
 uv run printing-company --debug --portfolio 2  # só a Portfolio II
 uv run printing-company --debug --phase-one    # inclui a Fase 1
+uv run printing-company --objective energy     # minimiza a energia
 ```
 
 **Exemplo:** a primeira carteira de pedidos do artigo.
@@ -49,6 +52,7 @@ from printing_company.problem.analysis import (
 from printing_company.problem.data import finishers, portfolios, printers
 from printing_company.problem.model import (
     SHIFT_HOURS,
+    Objective,
     build_problem,
     min_capacity,
 )
@@ -59,6 +63,9 @@ logger = logging.getLogger(__name__)
 
 settings = Settings()
 """Configurações do projeto, carregadas na importação."""
+
+objective_label = {Objective.TIME: "tempo", Objective.ENERGY: "energia"}
+"""Nome de cada objetivo nos logs do comando."""
 
 
 @click.command()
@@ -86,13 +93,33 @@ settings = Settings()
         "ser repetida, como em `-p 1 -p 3`. Sem ela, resolve todas."
     ),
 )
-def main(*, debug: bool, phase_one: bool, selected: tuple[int, ...]) -> None:
+@click.option(
+    "-o",
+    "--objective",
+    type=click.Choice(list(Objective), case_sensitive=False),
+    default=Objective.TIME.value,
+    show_default=True,
+    help=(
+        "O que minimizar: o tempo de operação (time, soma das horas "
+        "ligadas) ou o consumo de energia (energy, soma das potências "
+        "vezes as horas)."
+    ),
+)
+def main(
+    *,
+    debug: bool,
+    phase_one: bool,
+    selected: tuple[int, ...],
+    objective: Objective,
+) -> None:
     """Resolve as três carteiras de pedidos do artigo.
 
     Com `--portfolio`, resolve só as carteiras escolhidas (numeradas de 1
-    a 3, na ordem do artigo). Cada carteira é resolvida com o menor número de turnos diários que a
-    torna viável; para cada uma, mostra o tempo real (com setup), o
-    consumo e o custo de energia.
+    a 3, na ordem do artigo). Com `--objective`, escolhe se minimiza o
+    tempo de operação (padrão) ou o consumo de energia. Cada carteira é
+    resolvida com o menor número de turnos diários que a torna viável;
+    para cada uma, mostra o tempo real (com setup), o consumo e o custo
+    de energia.
     """
     # A docstring acima é a ajuda do comando (`printing-company --help`).
     # Veja `SHIFT_HOURS`, `min_capacity` e `printing_company.problem.analysis`.
@@ -112,8 +139,12 @@ def main(*, debug: bool, phase_one: bool, selected: tuple[int, ...]) -> None:
             printers=printers,
             finishings=finishers,
             capacity=days * SHIFT_HOURS,
+            objective=objective,
         )
-        logger.info(f">>> {portfolio.label}: {days} turnos")
+        logger.info(
+            f">>> {portfolio.label}: {days} turnos, "
+            f"objetivo: {objective_label[objective]}"
+        )
         logger.info(problem)
         solver = Solver(rule=PivotingRule.LEXICOGRAPHIC)
         solution = problem.solve(solver=solver)
